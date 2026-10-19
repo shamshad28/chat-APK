@@ -11,59 +11,90 @@ import { COLORS } from '../constants/theme';
 
 /**
  * Mobile Main Home Header Navbar
- * Top header for the Chats / Conversations List screen
+ * Adapts seamlessly across bottom tabs
  */
 export default function HomeHeaderNavbar({
+  activeTab = 'chats',
   appName = 'WhatsApp',
   onCameraPress,
   onSearchPress,
   onMenuPress,
   onMetaAiPress,
 }) {
+  const getTitle = () => {
+    switch (activeTab) {
+      case 'updates':
+        return 'Updates';
+      case 'communities':
+        return 'Communities';
+      case 'calls':
+        return 'Calls';
+      case 'settings':
+        return 'Settings';
+      default:
+        return appName;
+    }
+  };
+
+  const isMainChats = activeTab === 'chats';
+
   return (
     <View style={styles.container}>
-      {/* App Branding Title */}
+      {/* Brand or Tab Title */}
       <View style={styles.brandContainer}>
-        <Text style={styles.brandTitle}>{appName}</Text>
+        <Text
+          style={[
+            styles.brandTitle,
+            isMainChats ? styles.brandTitleLogo : styles.brandTitleNormal,
+          ]}
+        >
+          {getTitle()}
+        </Text>
       </View>
 
-      {/* Right Action Icons: Camera, Search, More Menu */}
+      {/* Right Action Icons */}
       <View style={styles.actionsContainer}>
-        {onMetaAiPress && (
+        {isMainChats && onMetaAiPress && (
           <TouchableOpacity
             style={styles.iconButton}
             onPress={onMetaAiPress}
             activeOpacity={0.7}
           >
             <View style={styles.metaAiCircle}>
-              <Ionicons name="sparkles" size={14} color="#60a5fa" />
+              <Ionicons name="sparkles" size={13} color="#38bdf8" />
             </View>
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={onCameraPress}
-          activeOpacity={0.7}
-        >
-          <Feather name="camera" size={20} color={COLORS.iconDefault} />
-        </TouchableOpacity>
+        {(isMainChats || activeTab === 'communities' || activeTab === 'updates') && (
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={onCameraPress}
+            activeOpacity={0.7}
+          >
+            <Feather name="camera" size={20} color={COLORS.iconDefault} />
+          </TouchableOpacity>
+        )}
 
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={onSearchPress}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="search" size={20} color={COLORS.iconDefault} />
-        </TouchableOpacity>
+        {activeTab !== 'communities' && (
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={onSearchPress}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="search" size={20} color={COLORS.iconDefault} />
+          </TouchableOpacity>
+        )}
 
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={onMenuPress}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons name="more-vert" size={22} color={COLORS.iconDefault} />
-        </TouchableOpacity>
+        {activeTab !== 'settings' && (
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={onMenuPress}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="more-vert" size={22} color={COLORS.iconDefault} />
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -71,7 +102,7 @@ export default function HomeHeaderNavbar({
 
 const styles = StyleSheet.create({
   container: {
-    height: 60,
+    height: 58,
     backgroundColor: COLORS.headerBackground,
     flexDirection: 'row',
     alignItems: 'center',
@@ -96,18 +127,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   brandTitle: {
+    letterSpacing: 0.2,
+  },
+  brandTitleLogo: {
     fontSize: 21,
     fontWeight: 'bold',
     color: COLORS.textSecondary,
-    letterSpacing: 0.3,
+  },
+  brandTitleNormal: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
   },
   actionsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   iconButton: {
-    padding: 8,
-    marginLeft: 4,
+    padding: 7,
+    marginLeft: 3,
     borderRadius: 20,
   },
   metaAiCircle: {

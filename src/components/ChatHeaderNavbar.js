@@ -75,7 +75,7 @@ export default function ChatHeaderNavbar({
                   ]}
                   numberOfLines={1}
                 >
-                  {subtitle}
+                  {isOnline ? 'online' : subtitle === 'online' ? 'offline' : subtitle || 'offline'}
                 </Text>
               )}
             </View>
