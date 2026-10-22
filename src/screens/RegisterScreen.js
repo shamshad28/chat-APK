@@ -44,9 +44,11 @@ export default function RegisterScreen({ onRegisterSuccess, onNavigateToLogin })
         name: name.trim(),
         username: username.trim().toLowerCase(),
         email: email.trim().toLowerCase(),
+        password: password,
         avatar: null,
         about: 'Hey there! I am using PulseChat.',
-        phone: '+91 98000 12345',
+        phone: '+91 98000 ' + Math.floor(10000 + Math.random() * 90000),
+        isOnline: true,
       };
       onRegisterSuccess && onRegisterSuccess(newUser);
     }, 800);
@@ -91,7 +93,7 @@ export default function RegisterScreen({ onRegisterSuccess, onNavigateToLogin })
                 <Ionicons name="person-outline" size={20} color={COLORS.iconDefault} style={styles.inputIcon} />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="e.g. Shamshad Khan"
+                  placeholder="e.g. Alex Morgan"
                   placeholderTextColor={COLORS.textMuted}
                   value={name}
                   onChangeText={setName}
@@ -106,7 +108,7 @@ export default function RegisterScreen({ onRegisterSuccess, onNavigateToLogin })
                 <Ionicons name="at-outline" size={20} color={COLORS.iconDefault} style={styles.inputIcon} />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="e.g. shamshad"
+                  placeholder="e.g. alex_m"
                   placeholderTextColor={COLORS.textMuted}
                   value={username}
                   onChangeText={setUsername}

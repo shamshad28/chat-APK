@@ -54,7 +54,7 @@ export default function ChatPreviewBody({
         {/* Message 1: Received */}
         <View style={[styles.messageBubble, styles.receivedBubble]}>
           <Text style={styles.messageText}>
-            Hey Shamshad! The new mobile app navigation bar looks super slick 🔥
+            Hey there! The new mobile app navigation bar looks super slick 🔥
           </Text>
           <View style={styles.metaRow}>
             <Text style={styles.timeText}>04:28 PM</Text>

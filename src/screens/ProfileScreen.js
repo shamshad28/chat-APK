@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -15,14 +15,30 @@ import { COLORS } from '../constants/theme';
 import { CURRENT_USER } from '../data/mockData';
 import QRCodeModal from '../components/profile/QRCodeModal';
 import cameraService from '../services/cameraService';
+import { useTheme } from '../context/ThemeContext';
 
-export default function ProfileScreen({ onBack, onLogout, onOpenChat }) {
-  const [user, setUser] = useState(CURRENT_USER);
+export default function ProfileScreen({
+  user: propUser,
+  onUpdateUser,
+  onBack,
+  onLogout,
+  onOpenChat,
+}) {
+  const { colors, isLight } = useTheme();
+  const [user, setUser] = useState(propUser || CURRENT_USER);
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingAbout, setIsEditingAbout] = useState(false);
   const [isQrModalVisible, setIsQrModalVisible] = useState(false);
-  const [name, setName] = useState(user.name);
-  const [about, setAbout] = useState(user.about);
+  const [name, setName] = useState(propUser?.name || CURRENT_USER.name);
+  const [about, setAbout] = useState(propUser?.about || '');
+
+  useEffect(() => {
+    if (propUser) {
+      setUser(propUser);
+      setName(propUser.name);
+      setAbout(propUser.about || '');
+    }
+  }, [propUser]);
 
   const handleChangeAvatar = () => {
     Alert.alert('Change Profile Photo', 'Select an option to update your photo:', [
@@ -31,7 +47,9 @@ export default function ProfileScreen({ onBack, onLogout, onOpenChat }) {
         onPress: async () => {
           const uri = await cameraService.capturePhoto();
           if (uri) {
-            setUser((prev) => ({ ...prev, avatar: uri }));
+            const updated = { ...user, avatar: uri };
+            setUser(updated);
+            if (onUpdateUser) onUpdateUser(updated);
           }
         },
       },
@@ -40,7 +58,9 @@ export default function ProfileScreen({ onBack, onLogout, onOpenChat }) {
         onPress: async () => {
           const uri = await cameraService.pickImageFromGallery();
           if (uri) {
-            setUser((prev) => ({ ...prev, avatar: uri }));
+            const updated = { ...user, avatar: uri };
+            setUser(updated);
+            if (onUpdateUser) onUpdateUser(updated);
           }
         },
       },
@@ -50,37 +70,41 @@ export default function ProfileScreen({ onBack, onLogout, onOpenChat }) {
 
   const handleSaveName = () => {
     if (!name.trim()) return;
-    setUser((prev) => ({ ...prev, name: name.trim() }));
+    const updated = { ...user, name: name.trim() };
+    setUser(updated);
+    if (onUpdateUser) onUpdateUser(updated);
     setIsEditingName(false);
     Alert.alert('Profile Updated', 'Your name has been updated successfully.');
   };
 
   const handleSaveAbout = () => {
-    setUser((prev) => ({ ...prev, about: about.trim() }));
+    const updated = { ...user, about: about.trim() };
+    setUser(updated);
+    if (onUpdateUser) onUpdateUser(updated);
     setIsEditingAbout(false);
     Alert.alert('Profile Updated', 'Your bio has been updated successfully.');
   };
 
   return (
-    <SafeAreaView style={styles.safeContainer}>
+    <SafeAreaView style={[styles.safeContainer, isLight && { backgroundColor: '#f0f2f5' }]}>
       {/* Top Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, isLight && styles.headerLight]}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn} activeOpacity={0.7}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+          <Ionicons name="arrow-back" size={24} color={isLight ? '#ffffff' : COLORS.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
+        <Text style={[styles.headerTitle, isLight && { color: '#ffffff' }]}>Profile</Text>
         <TouchableOpacity
           onPress={() => setIsQrModalVisible(true)}
           style={styles.qrHeaderBtn}
           activeOpacity={0.7}
         >
-          <Ionicons name="qr-code-outline" size={24} color={COLORS.accentGreen} />
+          <Ionicons name="qr-code-outline" size={24} color={isLight ? '#ffffff' : COLORS.accentGreen} />
         </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Profile Avatar Card */}
-        <View style={styles.avatarCard}>
+        <View style={[styles.avatarCard, isLight && styles.avatarCardLight]}>
           <View style={styles.avatarWrapper}>
             {user.avatar ? (
               <Image source={{ uri: user.avatar }} style={styles.avatarImage} />
@@ -99,12 +123,12 @@ export default function ProfileScreen({ onBack, onLogout, onOpenChat }) {
             <View style={styles.onlineDot} />
           </View>
 
-          <Text style={styles.displayName}>{user.name}</Text>
-          <Text style={styles.displayUsername}>@{user.username}</Text>
+          <Text style={[styles.displayName, isLight && { color: '#111b21' }]}>{user.name}</Text>
+          <Text style={[styles.displayUsername, isLight && { color: '#667781' }]}>@{user.username}</Text>
         </View>
 
         {/* Profile Details Cards */}
-        <View style={styles.sectionCard}>
+        <View style={[styles.sectionCard, isLight && styles.sectionCardLight]}>
           {/* Full Name */}
           <View style={styles.detailRow}>
             <View style={styles.iconCircle}>
@@ -283,6 +307,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
+  headerLight: {
+    backgroundColor: '#008069',
+    borderBottomColor: 'rgba(0, 0, 0, 0.08)',
+  },
   backBtn: {
     padding: 6,
   },
@@ -314,6 +342,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+  },
+  avatarCardLight: {
+    backgroundColor: '#ffffff',
+    borderBottomColor: '#e9edef',
+  },
+  sectionCardLight: {
+    backgroundColor: '#ffffff',
+    borderColor: '#e9edef',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   avatarWrapper: {
     position: 'relative',

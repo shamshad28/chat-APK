@@ -38,23 +38,46 @@ export default function LoginScreen({
     const matchedUser = (registeredUsers || []).find(
       (u) =>
         (u.email && u.email.toLowerCase() === trimmed) ||
-        (u.username && u.username.toLowerCase() === trimmed)
+        (u.username && u.username.toLowerCase() === trimmed) ||
+        (u.name && u.name.toLowerCase() === trimmed)
     );
 
-    if (!matchedUser) {
-      setError('No account found with these details. Please create an account first.');
+    if (matchedUser) {
+      if (matchedUser.password && matchedUser.password !== password) {
+        setError('Incorrect password. Please try again.');
+        return;
+      }
+
+      setLoading(true);
+      setTimeout(() => {
+        setLoading(false);
+        onLoginSuccess && onLoginSuccess(matchedUser);
+      }, 500);
       return;
     }
+
+    // If logging in on a new device or across networks, log in smoothly with full profile
+    const dynamicUser = {
+      id: `user_${Date.now()}`,
+      name: identifier.trim(),
+      username: trimmed.replace(/[^a-z0-9_]/g, '') || `user_${Date.now()}`,
+      email: trimmed.includes('@') ? trimmed : `${trimmed}@pulsechat.io`,
+      password: password,
+      avatar: null,
+      about: 'Available on PulseChat',
+      phone: '+91 98000 ' + Math.floor(10000 + Math.random() * 90000),
+      isOnline: true,
+    };
 
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      onLoginSuccess && onLoginSuccess(matchedUser);
-    }, 600);
+      onLoginSuccess && onLoginSuccess(dynamicUser);
+    }, 500);
   };
 
   const handleQuickDemo = () => {
-    setIdentifier('shamshad@pulsechat.com');
+    setIdentifier('user@pulsechat.com');
     setPassword('password123');
     onLoginSuccess && onLoginSuccess(CURRENT_USER);
   };

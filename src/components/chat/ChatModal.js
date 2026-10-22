@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -8,12 +8,15 @@ import {
   FlatList,
   TextInput,
   Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { COLORS } from '../../constants/theme';
 import { CONTACTS_LIST } from '../../data/mockData';
 import { getInitials } from './NotificationBanner';
+import socketService from '../../services/socketService';
+import storageService from '../../services/storageService';
 
 /**
  * ChatModal (New Chat & Contact Selection Modal)
@@ -26,16 +29,89 @@ export default function ChatModal({
   onOpenNewGroup,
   onJoinWithCode,
   onOpenLLM,
+  registeredUsers = [],
+  currentUser = null,
 }) {
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'unread' | 'favourites'
+  const [isAddContactModalOpen, setIsAddContactModalOpen] = useState(false);
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactPhone, setNewContactPhone] = useState('');
 
-  const filteredContacts = CONTACTS_LIST.filter((c) => {
-    if (!c.name.toLowerCase().includes(query.toLowerCase())) return false;
-    if (activeFilter === 'favourites') return c.isPinned;
-    if (activeFilter === 'unread') return c.unreadCount > 0;
-    return true;
-  });
+  // Combine registered users (excluding the logged-in user)
+  const allContacts = useMemo(() => {
+    const map = new Map();
+
+    (registeredUsers || []).forEach((u) => {
+      if (u.id === 'user_priya' || u.id === 'user_shamshad_mock') return;
+
+      const isSelf = currentUser && (
+        u.id === currentUser.id ||
+        (u.email && u.email.toLowerCase() === currentUser.email?.toLowerCase()) ||
+        (u.username && u.username.toLowerCase() === currentUser.username?.toLowerCase()) ||
+        u.name.toLowerCase() === currentUser.name?.toLowerCase()
+      );
+      if (isSelf) return;
+
+      const key = (u.username || u.name).toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, {
+          id: u.id || `u_${key}`,
+          name: u.name,
+          username: u.username,
+          avatar: u.avatar || null,
+          about: u.about || 'Available on PulseChat',
+          phone: u.phone || '+91 98000 12345',
+          isOnline: u.isOnline !== undefined ? u.isOnline : true,
+          status: u.about || 'Available',
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [registeredUsers, currentUser]);
+
+  const filteredContacts = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return allContacts.filter((c) => {
+      if (q) {
+        const nameMatch = c.name && c.name.toLowerCase().includes(q);
+        const usernameMatch = c.username && c.username.toLowerCase().includes(q);
+        const phoneMatch = c.phone && c.phone.includes(q);
+        if (!nameMatch && !usernameMatch && !phoneMatch) return false;
+      }
+      if (activeFilter === 'favourites') return c.isPinned;
+      if (activeFilter === 'unread') return c.unreadCount > 0;
+      return true;
+    });
+  }, [allContacts, query, activeFilter]);
+
+  const handleCreateAndSelectContact = async (name, usernameOrPhone) => {
+    if (!name || !name.trim()) return;
+    const trimmedName = name.trim();
+    const contactObj = {
+      id: `u_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      name: trimmedName,
+      username: (usernameOrPhone || trimmedName.toLowerCase().replace(/\s+/g, '_')).trim(),
+      avatar: null,
+      about: 'Available on PulseChat',
+      phone: usernameOrPhone || '+91 98000 12345',
+      isOnline: true,
+      status: 'Available',
+    };
+
+    // Persist to storage & announce via socket across all devices worldwide
+    await storageService.addRegisteredUser(contactObj);
+    socketService.announceUser(contactObj);
+
+    setIsAddContactModalOpen(false);
+    setNewContactName('');
+    setNewContactPhone('');
+    onClose();
+    if (onSelectContact) {
+      onSelectContact(contactObj);
+    }
+  };
 
   return (
     <Modal
@@ -52,7 +128,7 @@ export default function ChatModal({
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
             <Text style={styles.headerTitle}>Select contact</Text>
-            <Text style={styles.headerSubtitle}>{CONTACTS_LIST.length} contacts</Text>
+            <Text style={styles.headerSubtitle}>{filteredContacts.length} contacts</Text>
           </View>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <Ionicons name="close" size={24} color={COLORS.iconDefault} />
@@ -133,6 +209,21 @@ export default function ChatModal({
           keyExtractor={(item) => item.id}
           ListHeaderComponent={
             <View style={styles.actionsGroup}>
+              {/* 0. New Contact */}
+              <TouchableOpacity
+                style={styles.actionRow}
+                activeOpacity={0.7}
+                onPress={() => setIsAddContactModalOpen(true)}
+              >
+                <View style={[styles.actionCircle, { backgroundColor: COLORS.badgeGreen }]}>
+                  <Ionicons name="person-add" size={20} color="#111b21" />
+                </View>
+                <View>
+                  <Text style={styles.actionText}>New contact</Text>
+                  <Text style={styles.actionSubText}>Add by name, username or phone</Text>
+                </View>
+              </TouchableOpacity>
+
               {/* 1. New Group */}
               <TouchableOpacity
                 style={styles.actionRow}
@@ -184,8 +275,52 @@ export default function ChatModal({
                 </View>
               </TouchableOpacity>
 
+              {/* Direct Fast Chat Card for search query */}
+              {query.trim().length > 0 && (
+                <TouchableOpacity
+                  style={styles.directChatCard}
+                  activeOpacity={0.7}
+                  onPress={() => handleCreateAndSelectContact(query.trim())}
+                >
+                  <View style={styles.directChatIcon}>
+                    <Ionicons name="chatbubbles" size={20} color="#111b21" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.directChatTitle}>Start Chat with "{query.trim()}"</Text>
+                    <Text style={styles.directChatSubtitle}>🔒 End-to-end encrypted direct chat</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={COLORS.badgeGreen} />
+                </TouchableOpacity>
+              )}
+
               <Text style={styles.contactsSectionHeader}>CONTACTS ON WHATSAPP</Text>
             </View>
+          }
+          ListEmptyComponent={
+            query.trim() ? (
+              <View style={styles.emptySearchContainer}>
+                <View style={styles.emptySearchIconWrap}>
+                  <Ionicons name="person-add-outline" size={30} color={COLORS.accentGreen} />
+                </View>
+                <Text style={styles.emptySearchTitle}>No contact named "{query.trim()}"</Text>
+                <Text style={styles.emptySearchSubtitle}>
+                  Start a new end-to-end encrypted chat with {query.trim()} right now:
+                </Text>
+                <TouchableOpacity
+                  style={styles.startNewChatBtn}
+                  onPress={() => handleCreateAndSelectContact(query.trim())}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="chatbubble" size={17} color="#111b21" style={{ marginRight: 6 }} />
+                  <Text style={styles.startNewChatBtnText}>Chat with "{query.trim()}"</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.emptySearchContainer}>
+                <Ionicons name="people-outline" size={38} color={COLORS.textSecondary} />
+                <Text style={styles.emptySearchTitle}>No contacts available</Text>
+              </View>
+            )
           }
           renderItem={({ item }) => (
             <TouchableOpacity
@@ -217,6 +352,78 @@ export default function ChatModal({
           )}
           contentContainerStyle={styles.listContent}
         />
+
+        {/* Embedded Add New Contact Dialog Modal (100% reliable on Android, iOS & Web) */}
+        <Modal
+          visible={isAddContactModalOpen}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setIsAddContactModalOpen(false)}
+        >
+          <View style={styles.dialogBackdrop}>
+            <View style={styles.dialogCard}>
+              <View style={styles.dialogHeader}>
+                <View style={[styles.actionCircle, { backgroundColor: COLORS.badgeGreen, width: 38, height: 38, marginRight: 10 }]}>
+                  <Ionicons name="person-add" size={20} color="#111b21" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.dialogTitle}>Add New Contact</Text>
+                  <Text style={styles.dialogSubtitle}>Connect and chat with anyone worldwide</Text>
+                </View>
+              </View>
+
+              <View style={styles.dialogInputWrapper}>
+                <Text style={styles.dialogInputLabel}>NAME</Text>
+                <TextInput
+                  style={styles.dialogInput}
+                  placeholder="Full Name (e.g. Rahul Sharma)"
+                  placeholderTextColor={COLORS.textMuted}
+                  value={newContactName}
+                  onChangeText={setNewContactName}
+                  autoFocus={true}
+                />
+              </View>
+
+              <View style={styles.dialogInputWrapper}>
+                <Text style={styles.dialogInputLabel}>USERNAME OR PHONE (OPTIONAL)</Text>
+                <TextInput
+                  style={styles.dialogInput}
+                  placeholder="e.g. @rahul or +91 98000..."
+                  placeholderTextColor={COLORS.textMuted}
+                  value={newContactPhone}
+                  onChangeText={setNewContactPhone}
+                />
+              </View>
+
+              <View style={styles.dialogButtonsRow}>
+                <TouchableOpacity
+                  style={styles.dialogCancelBtn}
+                  onPress={() => {
+                    setIsAddContactModalOpen(false);
+                    setNewContactName('');
+                    setNewContactPhone('');
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.dialogCancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.dialogConfirmBtn,
+                    !newContactName.trim() && { opacity: 0.5 },
+                  ]}
+                  disabled={!newContactName.trim()}
+                  onPress={() => handleCreateAndSelectContact(newContactName, newContactPhone)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="chatbubbles" size={16} color="#111b21" style={{ marginRight: 6 }} />
+                  <Text style={styles.dialogConfirmText}>Add & Chat</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </Modal>
   );
@@ -413,4 +620,160 @@ const styles = StyleSheet.create({
     color: '#8696a0',
     marginTop: 2,
   },
+  emptySearchContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+  },
+  emptySearchIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(0, 168, 132, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  emptySearchTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#e9edef',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  emptySearchSubtitle: {
+    fontSize: 13,
+    color: '#8696a0',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  startNewChatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.badgeGreen,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+    elevation: 3,
+  },
+  startNewChatBtnText: {
+    color: '#111b21',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  directChatCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#202c33',
+    marginHorizontal: 16,
+    marginVertical: 8,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 168, 132, 0.3)',
+  },
+  directChatIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.badgeGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  directChatTitle: {
+    color: '#e9edef',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  directChatSubtitle: {
+    color: COLORS.accentGreen,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  dialogBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  dialogCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#1f2c34',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#2a3942',
+    elevation: 8,
+  },
+  dialogHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  dialogTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#e9edef',
+  },
+  dialogSubtitle: {
+    fontSize: 12,
+    color: '#8696a0',
+    marginTop: 2,
+  },
+  dialogInputWrapper: {
+    marginBottom: 14,
+  },
+  dialogInputLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#8696a0',
+    marginBottom: 6,
+    letterSpacing: 0.5,
+  },
+  dialogInput: {
+    backgroundColor: '#111b21',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: '#e9edef',
+    fontSize: 15,
+    borderWidth: 1,
+    borderColor: '#2a3942',
+  },
+  dialogButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+    marginTop: 10,
+  },
+  dialogCancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dialogCancelText: {
+    color: '#8696a0',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  dialogConfirmBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.badgeGreen,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+  },
+  dialogConfirmText: {
+    color: '#111b21',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
 });
+

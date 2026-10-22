@@ -7,9 +7,11 @@ import {
   TouchableOpacity,
   Image,
   Animated,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { COLORS } from '../../constants/theme';
 
 export default function IncomingCallModal({
@@ -72,6 +74,14 @@ export default function IncomingCallModal({
       <View style={styles.modalBackdrop}>
         <SafeAreaView style={styles.safeContainer}>
           <View style={styles.callCard}>
+            {/* Frosted Glass Backdrop */}
+            <BlurView
+              intensity={Platform.OS === 'ios' ? 70 : 85}
+              tint="dark"
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View style={styles.cardTintOverlay} />
+
             {/* Ambient Top Glow */}
             <View style={styles.ambientGlow} />
 
@@ -170,10 +180,9 @@ const styles = StyleSheet.create({
   callCard: {
     width: '100%',
     maxWidth: 360,
-    backgroundColor: '#111b21',
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: '#202c33',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     paddingVertical: 32,
     paddingHorizontal: 24,
     alignItems: 'center',
@@ -184,6 +193,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 20,
     elevation: 15,
+    ...(Platform.OS === 'web'
+      ? {
+          backdropFilter: 'blur(25px)',
+          WebkitBackdropFilter: 'blur(25px)',
+        }
+      : {}),
+  },
+  cardTintOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 29, 0.85)',
   },
   ambientGlow: {
     position: 'absolute',

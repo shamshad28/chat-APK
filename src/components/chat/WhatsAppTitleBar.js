@@ -14,6 +14,7 @@ import { COLORS } from '../../constants/theme';
  * Replaces web WhatsAppTitleBar.jsx with native cross-platform layout
  */
 export default function WhatsAppTitleBar({
+  currentUser,
   onMinimize,
   onMaximize,
   onClose,
@@ -23,15 +24,15 @@ export default function WhatsAppTitleBar({
 
   return (
     <View style={styles.container}>
-      {/* Left: Brand Icon & Title & Made By Shamshad Khan Badge */}
+      {/* Left: Brand Icon & Title & Current User & Made By Badge */}
       <View style={styles.brandRow}>
         <Ionicons name="logo-whatsapp" size={17} color={COLORS.accentGreen} />
         <Text style={styles.titleText}>WhatsApp</Text>
-        <View style={styles.creatorPill}>
-          <Text style={styles.creatorPillText}>
-            Made by <Text style={styles.creatorName}>Shamshad Khan</Text>
-          </Text>
-        </View>
+        {Boolean(currentUser?.name) && (
+          <View style={styles.userBadge}>
+            <Text style={styles.userBadgeText}>👤 {currentUser.name}</Text>
+          </View>
+        )}
       </View>
 
       {/* Right: Network Status & Desktop Window Controls */}
@@ -106,6 +107,20 @@ const styles = StyleSheet.create({
     color: '#d1d7db',
     marginLeft: 6,
     letterSpacing: 0.3,
+  },
+  userBadge: {
+    backgroundColor: 'rgba(0, 168, 132, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 168, 132, 0.4)',
+    marginLeft: 8,
+  },
+  userBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.accentGreen,
   },
   creatorPill: {
     backgroundColor: '#111b21',

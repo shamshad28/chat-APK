@@ -2,13 +2,16 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import CallsList from '../components/call/CallsList';
 import { COLORS } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 
 export default function CallsScreen({ onStartCall, onSimulateIncomingCall }) {
+  const { colors, isLight } = useTheme();
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <CallsList
         onStartCall={onStartCall}
         onSimulateIncomingCall={onSimulateIncomingCall}
+        isLight={isLight}
       />
     </View>
   );

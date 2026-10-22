@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons, Feather, MaterialIcons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
@@ -14,8 +15,12 @@ import { CURRENT_USER, MOCK_STATUSES, MOCK_CHANNELS } from '../data/mockData';
 import StatusViewerModal from '../components/status/StatusViewerModal';
 import CreateStatusModal from '../components/status/CreateStatusModal';
 import cameraService from '../services/cameraService';
+import { useTheme } from '../context/ThemeContext';
 
-export default function UpdatesScreen({ onSendStoryReply, onPublishStatus }) {
+export default function UpdatesScreen({ onSendStoryReply, onPublishStatus, theme }) {
+  const themeContext = useTheme();
+  const isLight = theme ? theme === 'Light' : themeContext.isLight;
+
   const [channels, setChannels] = useState(MOCK_CHANNELS || []);
   const [statuses, setStatuses] = useState(MOCK_STATUSES || []);
   const [myStatus, setMyStatus] = useState(null);
@@ -38,14 +43,23 @@ export default function UpdatesScreen({ onSendStoryReply, onPublishStatus }) {
         caption: 'Captured with Camera 📸',
         time: 'Just now',
         unviewedCount: 1,
-        hasUnviewed: true,
       };
       setMyStatus(newStatus);
-      if (onPublishStatus) {
-        onPublishStatus(newStatus);
-      }
-      Alert.alert('Status Updated', 'Your camera photo has been published to Status.');
+      onPublishStatus && onPublishStatus(newStatus);
     }
+  };
+
+  const handlePublishMyStatus = (createdStatus) => {
+    setMyStatus(createdStatus);
+    onPublishStatus && onPublishStatus(createdStatus);
+    setIsCreatorVisible(false);
+  };
+
+  const allStatusesToView = myStatus ? [myStatus, ...statuses] : statuses;
+
+  const handleOpenStatus = (index) => {
+    setSelectedStoryIndex(index);
+    setIsViewerVisible(true);
   };
 
   const toggleFollow = (channelId) => {
@@ -56,34 +70,20 @@ export default function UpdatesScreen({ onSendStoryReply, onPublishStatus }) {
     );
   };
 
-  const handleOpenStatus = (index) => {
-    setSelectedStoryIndex(index);
-    setIsViewerVisible(true);
-  };
-
-  const handlePublishMyStatus = (newStatus) => {
-    setMyStatus(newStatus);
-    setStatuses((prev) => [newStatus, ...prev]);
-  };
-
-  const allStatusesToView = myStatus ? [myStatus, ...statuses] : statuses;
-
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isLight && styles.containerLight]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Status Section Header */}
+        {/* Status Section Title */}
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Status</Text>
-          <TouchableOpacity
-            onPress={() => Alert.alert('Status Privacy', 'Options: My contacts, My contacts except..., Only share with...')}
-          >
-            <MaterialIcons name="more-vert" size={22} color={COLORS.iconDefault} />
+          <Text style={[styles.sectionTitle, isLight && styles.sectionTitleLight]}>Status</Text>
+          <TouchableOpacity activeOpacity={0.7}>
+            <MaterialIcons name="more-vert" size={22} color={isLight ? '#54656f' : COLORS.iconDefault} />
           </TouchableOpacity>
         </View>
 
-        {/* My Status Card */}
+        {/* My Status Row */}
         <TouchableOpacity
-          style={styles.statusRow}
+          style={[styles.statusRow, isLight && styles.statusRowLight]}
           onPress={() => {
             if (myStatus) {
               handleOpenStatus(0);
@@ -94,25 +94,31 @@ export default function UpdatesScreen({ onSendStoryReply, onPublishStatus }) {
           activeOpacity={0.7}
         >
           <View style={styles.myAvatarWrapper}>
-            <Image source={{ uri: CURRENT_USER.avatar }} style={styles.statusAvatar} />
-            <View style={styles.plusBadge}>
-              <Ionicons name={myStatus ? "eye" : "add"} size={15} color="#111b21" />
+            {CURRENT_USER.avatar ? (
+              <Image source={{ uri: CURRENT_USER.avatar }} style={styles.statusAvatar} />
+            ) : (
+              <View style={[styles.statusAvatarPlaceholder, isLight && styles.statusAvatarPlaceholderLight]}>
+                <Ionicons name="person" size={28} color={isLight ? '#54656f' : '#8696a0'} />
+              </View>
+            )}
+            <View style={[styles.plusBadge, isLight && styles.plusBadgeLight]}>
+              <Ionicons name="add" size={16} color={isLight ? '#ffffff' : '#111b21'} />
             </View>
           </View>
           <View style={styles.statusInfo}>
-            <Text style={styles.statusName}>My status</Text>
-            <Text style={styles.statusSubtext}>
+            <Text style={[styles.statusName, isLight && styles.statusNameLight]}>My status</Text>
+            <Text style={[styles.statusSubtext, isLight && styles.statusSubtextLight]}>
               {myStatus ? 'Tap to view status update' : 'Tap to add status update'}
             </Text>
           </View>
         </TouchableOpacity>
 
         {/* Recent Updates */}
-        <Text style={styles.subHeader}>RECENT UPDATES</Text>
+        <Text style={[styles.subHeader, isLight && styles.subHeaderLight]}>RECENT UPDATES</Text>
         {statuses.map((item, idx) => (
           <TouchableOpacity
             key={item.id}
-            style={styles.statusRow}
+            style={[styles.statusRow, isLight && styles.statusRowLight]}
             onPress={() => handleOpenStatus(myStatus ? idx + 1 : idx)}
             activeOpacity={0.7}
           >
@@ -131,8 +137,8 @@ export default function UpdatesScreen({ onSendStoryReply, onPublishStatus }) {
               )}
             </View>
             <View style={styles.statusInfo}>
-              <Text style={styles.statusName}>{item.userName}</Text>
-              <Text style={styles.statusSubtext}>{item.time}</Text>
+              <Text style={[styles.statusName, isLight && styles.statusNameLight]}>{item.userName}</Text>
+              <Text style={[styles.statusSubtext, isLight && styles.statusSubtextLight]}>{item.time}</Text>
             </View>
           </TouchableOpacity>
         ))}
@@ -140,33 +146,43 @@ export default function UpdatesScreen({ onSendStoryReply, onPublishStatus }) {
         {/* Channels Section */}
         <View style={styles.channelsHeaderRow}>
           <View>
-            <Text style={styles.sectionTitle}>Channels</Text>
-            <Text style={styles.channelsSubtitle}>
+            <Text style={[styles.sectionTitle, isLight && styles.sectionTitleLight]}>Channels</Text>
+            <Text style={[styles.channelsSubtitle, isLight && styles.channelsSubtitleLight]}>
               Stay updated on topics you care about
             </Text>
           </View>
         </View>
 
         {channels.map((ch) => (
-          <View key={ch.id} style={styles.channelRow}>
+          <View key={ch.id} style={[styles.channelRow, isLight && styles.channelRowLight]}>
             <Image source={{ uri: ch.avatar }} style={styles.channelAvatar} />
             <View style={styles.channelInfo}>
               <View style={styles.channelNameRow}>
-                <Text style={styles.channelName}>{ch.name}</Text>
+                <Text style={[styles.channelName, isLight && styles.channelNameLight]}>{ch.name}</Text>
                 {ch.verified && (
                   <Ionicons name="checkmark-circle" size={15} color="#00a884" style={{ marginLeft: 4 }} />
                 )}
               </View>
-              <Text style={styles.channelUpdate} numberOfLines={1}>
+              <Text style={[styles.channelUpdate, isLight && styles.channelUpdateLight]} numberOfLines={1}>
                 {ch.lastUpdate}
               </Text>
               <Text style={styles.channelFollowers}>{ch.followers}</Text>
             </View>
             <TouchableOpacity
-              style={[styles.followBtn, ch.isFollowing && styles.followingBtn]}
+              style={[
+                styles.followBtn,
+                isLight && styles.followBtnLight,
+                ch.isFollowing && (isLight ? styles.followingBtnLight : styles.followingBtn),
+              ]}
               onPress={() => toggleFollow(ch.id)}
             >
-              <Text style={[styles.followBtnText, ch.isFollowing && styles.followingBtnText]}>
+              <Text
+                style={[
+                  styles.followBtnText,
+                  isLight && styles.followBtnTextLight,
+                  ch.isFollowing && styles.followingBtnText,
+                ]}
+              >
                 {ch.isFollowing ? 'Following' : 'Follow'}
               </Text>
             </TouchableOpacity>
@@ -177,19 +193,19 @@ export default function UpdatesScreen({ onSendStoryReply, onPublishStatus }) {
       {/* Floating Buttons: Edit Status (pen) & Camera */}
       <View style={styles.fabsContainer}>
         <TouchableOpacity
-          style={styles.pencilFab}
+          style={[styles.pencilFab, isLight && styles.pencilFabLight]}
           onPress={() => setIsCreatorVisible(true)}
           activeOpacity={0.85}
         >
-          <Feather name="edit-2" size={18} color={COLORS.textPrimary} />
+          <Feather name="edit-2" size={18} color={isLight ? '#111b21' : COLORS.textPrimary} />
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.cameraFab}
+          style={[styles.cameraFab, isLight && styles.cameraFabLight]}
           onPress={handleCameraStatus}
           activeOpacity={0.85}
         >
-          <Feather name="camera" size={24} color="#111b21" />
+          <Feather name="camera" size={24} color={isLight ? '#ffffff' : '#111b21'} />
         </TouchableOpacity>
       </View>
 
@@ -215,7 +231,10 @@ export default function UpdatesScreen({ onSendStoryReply, onPublishStatus }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#111b21',
+  },
+  containerLight: {
+    backgroundColor: '#ffffff',
   },
   scrollContent: {
     paddingBottom: 110,
@@ -231,7 +250,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: COLORS.textPrimary,
+    color: '#e9edef',
+  },
+  sectionTitleLight: {
+    color: '#111b21',
   },
   statusRow: {
     flexDirection: 'row',
@@ -239,6 +261,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
+  statusRowLight: {},
   myAvatarWrapper: {
     position: 'relative',
     marginRight: 14,
@@ -247,6 +270,17 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
+  },
+  statusAvatarPlaceholder: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#202c33',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusAvatarPlaceholderLight: {
+    backgroundColor: '#e9edef',
   },
   plusBadge: {
     position: 'absolute',
@@ -259,7 +293,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: COLORS.background,
+    borderColor: '#111b21',
+  },
+  plusBadgeLight: {
+    backgroundColor: '#008069',
+    borderColor: '#ffffff',
   },
   statusInfo: {
     flex: 1,
@@ -267,69 +305,85 @@ const styles = StyleSheet.create({
   statusName: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.textPrimary,
-    marginBottom: 2,
+    color: '#e9edef',
+  },
+  statusNameLight: {
+    color: '#111b21',
   },
   statusSubtext: {
     fontSize: 13,
-    color: COLORS.textSecondary,
+    color: '#8696a0',
+    marginTop: 2,
+  },
+  statusSubtextLight: {
+    color: '#54656f',
   },
   subHeader: {
     fontSize: 12,
     fontWeight: '700',
-    color: COLORS.textSecondary,
+    color: '#8696a0',
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 6,
+    letterSpacing: 0.5,
+  },
+  subHeaderLight: {
+    color: '#667781',
   },
   ringWrapper: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 2.5,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    padding: 2,
+    marginRight: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
   unviewedRing: {
+    borderWidth: 2.5,
     borderColor: COLORS.accentGreen,
   },
   viewedRing: {
-    borderColor: '#374248',
+    borderWidth: 2,
+    borderColor: '#8696a0',
   },
   statusAvatarInner: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
   },
   channelsHeaderRow: {
     paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 12,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    marginTop: 12,
+    paddingTop: 22,
+    paddingBottom: 10,
   },
   channelsSubtitle: {
     fontSize: 13,
-    color: COLORS.textSecondary,
+    color: '#8696a0',
     marginTop: 2,
+  },
+  channelsSubtitleLight: {
+    color: '#54656f',
   },
   channelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  channelRowLight: {
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
   },
   channelAvatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    marginRight: 12,
+    marginRight: 14,
   },
   channelInfo: {
     flex: 1,
-    marginRight: 10,
   },
   channelNameRow: {
     flexDirection: 'row',
@@ -338,12 +392,18 @@ const styles = StyleSheet.create({
   channelName: {
     fontSize: 15,
     fontWeight: '600',
-    color: COLORS.textPrimary,
+    color: '#e9edef',
+  },
+  channelNameLight: {
+    color: '#111b21',
   },
   channelUpdate: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
+    fontSize: 12.5,
+    color: '#8696a0',
     marginTop: 1,
+  },
+  channelUpdateLight: {
+    color: '#54656f',
   },
   channelFollowers: {
     fontSize: 11,
@@ -358,21 +418,35 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#00a88440',
   },
+  followBtnLight: {
+    backgroundColor: '#e7f7ef',
+    borderColor: '#00806940',
+  },
   followingBtn: {
     backgroundColor: '#202c33',
     borderColor: '#2a3942',
+  },
+  followingBtnLight: {
+    backgroundColor: '#f0f2f5',
+    borderColor: '#e9edef',
   },
   followBtnText: {
     color: COLORS.accentGreen,
     fontSize: 13,
     fontWeight: '600',
   },
+  followBtnTextLight: {
+    color: '#008069',
+  },
   followingBtnText: {
     color: COLORS.textSecondary,
   },
+  scrollContent: {
+    paddingBottom: 110,
+  },
   fabsContainer: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 96,
     right: 18,
     alignItems: 'center',
     gap: 14,
@@ -388,6 +462,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2a3942',
   },
+  pencilFabLight: {
+    backgroundColor: '#f0f2f5',
+    borderColor: '#e9edef',
+  },
   cameraFab: {
     width: 56,
     height: 56,
@@ -396,5 +474,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 6,
+  },
+  cameraFabLight: {
+    backgroundColor: '#008069',
   },
 });

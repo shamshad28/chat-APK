@@ -13,8 +13,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
 import { CONTACTS_LIST } from '../data/mockData';
+import { useTheme } from '../context/ThemeContext';
 
 export default function CreateGroupScreen({ onBack, onGroupCreated }) {
+  const { colors, isLight } = useTheme();
   const [groupName, setGroupName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedContactIds, setSelectedContactIds] = useState([]);
@@ -68,15 +70,15 @@ export default function CreateGroupScreen({ onBack, onGroupCreated }) {
   );
 
   return (
-    <SafeAreaView style={styles.safeContainer}>
+    <SafeAreaView style={[styles.safeContainer, isLight && { backgroundColor: '#f0f2f5' }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, isLight && { backgroundColor: '#008069', borderBottomColor: 'rgba(0,0,0,0.08)' }]}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+          <Ionicons name="arrow-back" size={24} color={isLight ? '#ffffff' : COLORS.textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>New group</Text>
-          <Text style={styles.headerSubtitle}>
+          <Text style={[styles.headerTitle, isLight && { color: '#ffffff' }]}>New group</Text>
+          <Text style={[styles.headerSubtitle, isLight && { color: '#e7fed8' }]}>
             {selectedContactIds.length > 0
               ? `${selectedContactIds.length} of ${CONTACTS_LIST.length} selected`
               : 'Add participants'}
@@ -85,22 +87,22 @@ export default function CreateGroupScreen({ onBack, onGroupCreated }) {
       </View>
 
       {/* Group Info Input Card */}
-      <View style={styles.groupInfoCard}>
+      <View style={[styles.groupInfoCard, isLight && { backgroundColor: '#ffffff', borderBottomColor: '#e9edef' }]}>
         <TouchableOpacity
           style={styles.avatarPicker}
           onPress={() => Alert.alert('Group Icon', 'Select a group photo or icon')}
         >
-          <Feather name="camera" size={20} color={COLORS.iconDefault} />
+          <Feather name="camera" size={20} color={isLight ? '#54656f' : COLORS.iconDefault} />
         </TouchableOpacity>
         <TextInput
-          style={styles.groupNameInput}
+          style={[styles.groupNameInput, isLight && { color: '#111b21', borderBottomColor: '#00a884' }]}
           placeholder="Type group subject here..."
-          placeholderTextColor={COLORS.textMuted}
+          placeholderTextColor={isLight ? '#8696a0' : COLORS.textMuted}
           value={groupName}
           onChangeText={setGroupName}
           maxLength={50}
         />
-        <Ionicons name="happy-outline" size={22} color={COLORS.iconDefault} />
+        <Ionicons name="happy-outline" size={22} color={isLight ? '#54656f' : COLORS.iconDefault} />
       </View>
 
       {/* Selected Participants Chips Bar */}
@@ -123,12 +125,12 @@ export default function CreateGroupScreen({ onBack, onGroupCreated }) {
       )}
 
       {/* Search Input */}
-      <View style={styles.searchBar}>
-        <Ionicons name="search" size={18} color={COLORS.iconDefault} style={styles.searchIcon} />
+      <View style={[styles.searchBar, isLight && { backgroundColor: '#ffffff', borderColor: '#e9edef' }]}>
+        <Ionicons name="search" size={18} color={isLight ? '#54656f' : COLORS.iconDefault} style={styles.searchIcon} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, isLight && { color: '#111b21' }]}
           placeholder="Search contacts..."
-          placeholderTextColor={COLORS.textMuted}
+          placeholderTextColor={isLight ? '#8696a0' : COLORS.textMuted}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -155,7 +157,7 @@ export default function CreateGroupScreen({ onBack, onGroupCreated }) {
                 )}
               </View>
               <View style={styles.contactDetails}>
-                <Text style={styles.contactName}>{item.name}</Text>
+                <Text style={[styles.contactName, isLight && { color: '#111b21' }]}>{item.name}</Text>
                 <Text style={styles.contactStatus} numberOfLines={1}>{item.status}</Text>
               </View>
               <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>

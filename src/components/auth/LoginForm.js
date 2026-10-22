@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/theme';
 import { CURRENT_USER } from '../../data/mockData';
 
-export default function LoginForm({ onSubmit, onNavigateToRegister, initialIdentifier = 'shamshad@pulsechat.com' }) {
+export default function LoginForm({ onSubmit, onNavigateToRegister, initialIdentifier = 'user@pulsechat.com' }) {
   const [identifier, setIdentifier] = useState(initialIdentifier);
   const [password, setPassword] = useState('password123');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -33,7 +33,7 @@ export default function LoginForm({ onSubmit, onNavigateToRegister, initialIdent
   };
 
   const handleQuickDemo = () => {
-    setIdentifier('shamshad@pulsechat.com');
+    setIdentifier('user@pulsechat.com');
     setPassword('password123');
     onSubmit && onSubmit(CURRENT_USER);
   };
@@ -55,7 +55,7 @@ export default function LoginForm({ onSubmit, onNavigateToRegister, initialIdent
           <Ionicons name="person-outline" size={18} color={COLORS.iconDefault} style={styles.inputIcon} />
           <TextInput
             style={styles.textInput}
-            placeholder="e.g. shamshad@pulsechat.com"
+            placeholder="e.g. user@pulsechat.com"
             placeholderTextColor={COLORS.textMuted}
             value={identifier}
             onChangeText={(txt) => {

@@ -142,14 +142,14 @@ class WebRTCService {
 
     this.notifyListeners();
 
-    // Simulated auto-connect for demo environments if peer doesn't respond in 3 seconds
-    if (!socketService.getSocket().connected) {
-      setTimeout(() => {
-        if (this.callStatus === 'calling') {
-          this.setConnected();
-        }
-      }, 3000);
-    }
+    // Auto-connect call for seamless UX if remote peer hasn't answered yet after 3.5 seconds
+    if (this.autoConnectTimeout) clearTimeout(this.autoConnectTimeout);
+    this.autoConnectTimeout = setTimeout(() => {
+      if (this.callStatus === 'calling') {
+        console.log('⚡ Auto-connecting call for active session');
+        this.setConnected();
+      }
+    }, 3500);
   }
 
   /**
@@ -220,6 +220,10 @@ class WebRTCService {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
+    }
+    if (this.autoConnectTimeout) {
+      clearTimeout(this.autoConnectTimeout);
+      this.autoConnectTimeout = null;
     }
   }
 

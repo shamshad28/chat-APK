@@ -9,10 +9,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { COLORS } from '../../constants/theme';
+import cameraService from '../../services/cameraService';
 
 const STATUS_BACKGROUNDS = [
   '#065f46', // Emerald
@@ -31,12 +33,23 @@ export default function CreateStatusModal({
 }) {
   const [text, setText] = useState('');
   const [selectedBg, setSelectedBg] = useState(STATUS_BACKGROUNDS[0]);
+  const [mediaUri, setMediaUri] = useState(null);
 
   if (!visible) return null;
 
+  const handlePickImage = async () => {
+    const uri = await cameraService.pickImageFromGallery();
+    if (uri) setMediaUri(uri);
+  };
+
+  const handleCapturePhoto = async () => {
+    const uri = await cameraService.capturePhoto();
+    if (uri) setMediaUri(uri);
+  };
+
   const handlePublish = () => {
-    if (!text.trim()) {
-      Alert.alert('Empty Status', 'Please enter some text for your status.');
+    if (!text.trim() && !mediaUri) {
+      Alert.alert('Empty Status', 'Please enter some text or capture/choose a photo for your status.');
       return;
     }
 
@@ -45,7 +58,8 @@ export default function CreateStatusModal({
       userName: 'My status',
       avatar: null,
       text: text.trim(),
-      bgColor: selectedBg,
+      mediaUrl: mediaUri,
+      bgColor: mediaUri ? '#0b141a' : selectedBg,
       time: 'Just now',
       createdAt: new Date().toISOString(),
       isMine: true,
@@ -54,6 +68,7 @@ export default function CreateStatusModal({
 
     onPublishStatus && onPublishStatus(newStatus);
     setText('');
+    setMediaUri(null);
     onClose();
     Alert.alert('Status Updated', 'Your status will disappear after 24 hours.');
   };
@@ -71,43 +86,61 @@ export default function CreateStatusModal({
       transparent={false}
       onRequestClose={onClose}
     >
-      <SafeAreaView style={[styles.container, { backgroundColor: selectedBg }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: mediaUri ? '#0b141a' : selectedBg }]}>
         <KeyboardAvoidingView
           style={styles.keyboardContainer}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          {/* Top Bar with Close, Color Cycle, Emoji, Font */}
+          {/* Top Bar with Close, Color Cycle, Camera, Gallery */}
           <View style={styles.topBar}>
             <TouchableOpacity onPress={onClose} style={styles.iconBtn}>
               <Ionicons name="close" size={26} color="#ffffff" />
             </TouchableOpacity>
 
             <View style={styles.topRightIcons}>
-              {/* Color Cycle Button */}
-              <TouchableOpacity onPress={cycleBackground} style={styles.iconBtn}>
-                <Ionicons name="color-palette-outline" size={24} color="#ffffff" />
+              {/* Camera Button */}
+              <TouchableOpacity onPress={handleCapturePhoto} style={styles.iconBtn}>
+                <Ionicons name="camera-outline" size={22} color="#ffffff" />
               </TouchableOpacity>
 
-              {/* Text format */}
-              <TouchableOpacity
-                onPress={() => Alert.alert('Font Style', 'Font style toggled')}
-                style={styles.iconBtn}
-              >
-                <Ionicons name="text-outline" size={24} color="#ffffff" />
+              {/* Gallery Button */}
+              <TouchableOpacity onPress={handlePickImage} style={styles.iconBtn}>
+                <Ionicons name="images-outline" size={22} color="#ffffff" />
               </TouchableOpacity>
+
+              {/* Color Cycle Button (if no image attached) */}
+              {!mediaUri && (
+                <TouchableOpacity onPress={cycleBackground} style={styles.iconBtn}>
+                  <Ionicons name="color-palette-outline" size={24} color="#ffffff" />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
-          {/* Centered Large Text Input */}
+          {/* Attached Media Preview (if photo selected) */}
+          {mediaUri && (
+            <View style={styles.mediaPreviewContainer}>
+              <Image source={{ uri: mediaUri }} style={styles.mediaPreviewImage} resizeMode="contain" />
+              <TouchableOpacity
+                style={styles.removeMediaBtn}
+                onPress={() => setMediaUri(null)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="close-circle" size={26} color="#ef4444" />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Centered Large Text / Caption Input */}
           <View style={styles.inputArea}>
             <TextInput
-              style={styles.statusInput}
-              placeholder="Type a status..."
+              style={[styles.statusInput, Boolean(mediaUri) && styles.captionInput]}
+              placeholder={mediaUri ? 'Add a caption...' : 'Type a status...'}
               placeholderTextColor="rgba(255, 255, 255, 0.6)"
               multiline
               value={text}
               onChangeText={setText}
-              autoFocus
+              autoFocus={!mediaUri}
               maxLength={700}
             />
           </View>
@@ -120,9 +153,9 @@ export default function CreateStatusModal({
             </View>
 
             <TouchableOpacity
-              style={[styles.sendFab, !text.trim() && { opacity: 0.5 }]}
+              style={[styles.sendFab, !text.trim() && !mediaUri && { opacity: 0.5 }]}
               onPress={handlePublish}
-              disabled={!text.trim()}
+              disabled={!text.trim() && !mediaUri}
               activeOpacity={0.85}
             >
               <Ionicons name="send" size={22} color="#111b21" />
@@ -209,5 +242,30 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 6,
     elevation: 8,
+  },
+  mediaPreviewContainer: {
+    height: 260,
+    width: '100%',
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    marginVertical: 10,
+  },
+  mediaPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  removeMediaBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 14,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 14,
+  },
+  captionInput: {
+    fontSize: 20,
+    lineHeight: 28,
+    maxHeight: 100,
   },
 });

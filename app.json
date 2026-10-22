@@ -2,6 +2,7 @@
   "expo": {
     "name": "PulseChat",
     "slug": "pulsechat",
+    "scheme": "pulsechat",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -47,7 +48,8 @@
         {
           "cameraPermission": "Allow PulseChat to access your camera for video calls and QR scanning.",
           "microphonePermission": "Allow PulseChat to access your microphone for video calls.",
-          "recordAudioAndroid": true
+          "recordAudioAndroid": true,
+          "barcodeScannerEnabled": true
         }
       ],
       [

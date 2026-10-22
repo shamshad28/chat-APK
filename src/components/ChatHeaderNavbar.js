@@ -6,29 +6,36 @@ import {
   TouchableOpacity,
   Image,
   Platform,
-  StatusBar,
 } from 'react-native';
 import { Ionicons, MaterialIcons, Feather } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
 
 /**
  * Mobile Chat Header Navbar
- * Modeled after WhatsApp Mobile Active Chat View
+ * Modeled after WhatsApp Mobile Active Chat View with Frosted Glassmorphism
  */
 export default function ChatHeaderNavbar({
-  title = 'Shamshad Khan',
+  title = 'Chat',
   subtitle = 'online',
   avatarUrl = null,
   isOnline = true,
   isTyping = false,
+  isLight = false,
   onBack,
   onProfilePress,
   onVideoCall,
   onVoiceCall,
   onMenuPress,
 }) {
+  const iconColor = isLight ? '#ffffff' : '#aebac1';
+  const textColor = isLight ? '#ffffff' : '#e9edef';
+  const subtextColor = isLight ? '#d9fdd3' : '#8696a0';
+
   return (
-    <View style={styles.headerContainer}>
+    <View style={[styles.headerContainer, isLight && styles.headerContainerLight]}>
+      {/* Specular Top Rim */}
+      <View style={[styles.glassTopRim, isLight && styles.glassTopRimLight]} />
+
       {/* Left section: Back button + Avatar + User Info */}
       <View style={styles.leftSection}>
         <TouchableOpacity
@@ -37,7 +44,7 @@ export default function ChatHeaderNavbar({
           activeOpacity={0.7}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+          <Ionicons name="arrow-back" size={24} color={textColor} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -50,28 +57,29 @@ export default function ChatHeaderNavbar({
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
             ) : (
-              <View style={styles.avatarPlaceholder}>
+              <View style={[styles.avatarPlaceholder, isLight && styles.avatarPlaceholderLight]}>
                 <Text style={styles.avatarText}>
                   {title ? title.charAt(0).toUpperCase() : 'U'}
                 </Text>
               </View>
             )}
-            {isOnline && <View style={styles.onlineBadge} />}
+            {isOnline && <View style={[styles.onlineBadge, isLight && styles.onlineBadgeLight]} />}
           </View>
 
           {/* Contact Details (Name + Online/Typing Status) */}
           <View style={styles.titleContainer}>
-            <Text style={styles.contactName} numberOfLines={1}>
+            <Text style={[styles.contactName, { color: textColor }]} numberOfLines={1}>
               {title}
             </Text>
             <View style={styles.statusRow}>
               {isTyping ? (
-                <Text style={styles.typingStatus}>typing...</Text>
+                <Text style={[styles.typingStatus, isLight && { color: '#ffffff' }]}>typing...</Text>
               ) : (
                 <Text
                   style={[
                     styles.contactStatus,
-                    isOnline && styles.onlineStatusText,
+                    { color: subtextColor },
+                    isOnline && (isLight ? { color: '#e7f7ef', fontWeight: '600' } : styles.onlineStatusText),
                   ]}
                   numberOfLines={1}
                 >
@@ -90,7 +98,7 @@ export default function ChatHeaderNavbar({
           onPress={onVideoCall}
           activeOpacity={0.7}
         >
-          <Ionicons name="videocam" size={22} color={COLORS.iconDefault} />
+          <Ionicons name="videocam" size={22} color={iconColor} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -98,7 +106,7 @@ export default function ChatHeaderNavbar({
           onPress={onVoiceCall}
           activeOpacity={0.7}
         >
-          <Ionicons name="call" size={20} color={COLORS.iconDefault} />
+          <Ionicons name="call" size={20} color={iconColor} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -109,7 +117,7 @@ export default function ChatHeaderNavbar({
           <MaterialIcons
             name="more-vert"
             size={22}
-            color={COLORS.iconDefault}
+            color={iconColor}
           />
         </TouchableOpacity>
       </View>
@@ -120,13 +128,17 @@ export default function ChatHeaderNavbar({
 const styles = StyleSheet.create({
   headerContainer: {
     height: 60,
-    backgroundColor: COLORS.headerBackground,
+    backgroundColor: 'rgba(32, 44, 51, 0.92)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    position: 'relative',
+    ...(Platform.OS === 'web'
+      ? { backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }
+      : {}),
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -138,6 +150,21 @@ const styles = StyleSheet.create({
         elevation: 4,
       },
     }),
+  },
+  headerContainerLight: {
+    backgroundColor: '#008069',
+    borderBottomColor: 'rgba(0, 0, 0, 0.06)',
+  },
+  glassTopRim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  glassTopRimLight: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
   },
   leftSection: {
     flex: 1,
@@ -175,8 +202,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#00a884',
   },
+  avatarPlaceholderLight: {
+    backgroundColor: '#006a55',
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+  },
   avatarText: {
-    color: COLORS.textWhite,
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -189,7 +220,10 @@ const styles = StyleSheet.create({
     borderRadius: 5.5,
     backgroundColor: COLORS.onlineDot,
     borderWidth: 2,
-    borderColor: COLORS.headerBackground,
+    borderColor: '#202c33',
+  },
+  onlineBadgeLight: {
+    borderColor: '#008069',
   },
   titleContainer: {
     flex: 1,
@@ -198,8 +232,7 @@ const styles = StyleSheet.create({
   contactName: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.textPrimary,
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
   statusRow: {
     flexDirection: 'row',
@@ -208,7 +241,6 @@ const styles = StyleSheet.create({
   },
   contactStatus: {
     fontSize: 12,
-    color: COLORS.textSecondary,
   },
   onlineStatusText: {
     color: COLORS.accentGreen,
@@ -217,8 +249,8 @@ const styles = StyleSheet.create({
   typingStatus: {
     fontSize: 12,
     color: COLORS.accentGreen,
-    fontWeight: '600',
     fontStyle: 'italic',
+    fontWeight: '500',
   },
   rightSection: {
     flexDirection: 'row',

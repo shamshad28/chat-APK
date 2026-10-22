@@ -1,30 +1,120 @@
 import * as ImagePicker from 'expo-image-picker';
-import { Camera } from 'expo-camera';
-import { Alert, Platform } from 'react-native';
+import { getCameraPermissionsAsync, requestCameraPermissionsAsync } from 'expo-camera';
+import { Alert, Platform, Linking } from 'react-native';
 
 /**
- * Capture photo directly using device camera
+ * Check Camera Permission Status
  */
-export async function capturePhoto() {
+export async function checkCameraPermission() {
   try {
-    // 1. Check & request permission
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        const camStatus = await Camera.requestCameraPermissionsAsync();
-        if (!camStatus.granted) {
-          return await promptCameraFallback('Camera permission is needed to take live photos.');
-        }
-      }
-    } catch (permErr) {
-      console.log('Permission check notice:', permErr);
+    const camStatus = await getCameraPermissionsAsync();
+    if (camStatus?.granted) return true;
+
+    const pickerStatus = await ImagePicker.getCameraPermissionsAsync();
+    return !!pickerStatus?.granted;
+  } catch (error) {
+    console.warn('Error checking camera permission:', error);
+    return false;
+  }
+}
+
+/**
+ * Request Camera Permission
+ */
+export async function requestCameraPermission() {
+  try {
+    const camRes = await requestCameraPermissionsAsync();
+    if (camRes?.granted) return true;
+
+    const pickerRes = await ImagePicker.requestCameraPermissionsAsync();
+    if (pickerRes?.granted) return true;
+
+    if (!camRes?.canAskAgain && !pickerRes?.canAskAgain && Platform.OS !== 'web') {
+      promptOpenSettings('Camera Access Required', 'PulseChat requires camera permission to capture photos and make video calls. Please enable it in device settings.');
+    }
+    return false;
+  } catch (error) {
+    console.warn('Error requesting camera permission:', error);
+    return false;
+  }
+}
+
+/**
+ * Check Media Library (Photo Gallery) Permission Status
+ */
+export async function checkMediaPermission() {
+  try {
+    const status = await ImagePicker.getMediaLibraryPermissionsAsync();
+    return !!status.granted;
+  } catch (error) {
+    console.warn('Error checking media library permission:', error);
+    return false;
+  }
+}
+
+/**
+ * Request Media Library Permission
+ */
+export async function requestMediaPermission() {
+  try {
+    const res = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (res.granted) return true;
+
+    if (!res.canAskAgain && Platform.OS !== 'web') {
+      promptOpenSettings('Photo Library Access Required', 'PulseChat needs access to your photo library to send photos and update your profile picture. Please enable it in device settings.');
+    }
+    return false;
+  } catch (error) {
+    console.warn('Error requesting media library permission:', error);
+    return false;
+  }
+}
+
+/**
+ * Open Device Settings Helper
+ */
+function promptOpenSettings(title, message) {
+  Alert.alert(
+    title,
+    message,
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Open Settings',
+        onPress: () => {
+          Linking.openSettings().catch((e) => console.warn('Could not open settings:', e));
+        },
+      },
+    ]
+  );
+}
+
+/**
+ * Capture photo using device camera with graceful permission checks and options
+ */
+export async function capturePhoto(options = {}) {
+  const {
+    allowsEditing = false,
+    quality = 0.85,
+    cameraType = 'front', // 'front' | 'back'
+  } = options;
+
+  try {
+    const hasPermission = await requestCameraPermission();
+    if (!hasPermission) {
+      return await promptCameraFallback('Camera permission is required to capture photos.');
     }
 
-    // 2. Launch system camera
+    const cameraDirection =
+      cameraType === 'front'
+        ? ImagePicker.CameraType?.front ?? 'front'
+        : ImagePicker.CameraType?.back ?? 'back';
+
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.85,
+      allowsEditing,
+      quality,
+      cameraType: cameraDirection,
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -54,7 +144,7 @@ function promptCameraFallback(reason) {
           },
         },
         {
-          text: 'Use Live Photo Sample 📷',
+          text: 'Use Sample Photo 📷',
           onPress: () => {
             resolve('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600');
           },
@@ -70,23 +160,32 @@ function promptCameraFallback(reason) {
 }
 
 /**
- * Pick image from photo gallery
+ * Pick image from photo gallery with options
  */
-export async function pickImageFromGallery() {
+export async function pickImageFromGallery(options = {}) {
+  const {
+    allowsEditing = false,
+    quality = 0.85,
+    allowsMultipleSelection = false,
+  } = options;
+
   try {
-    try {
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-    } catch (e) {
-      // Ignore
+    const hasPermission = await requestMediaPermission();
+    if (!hasPermission) {
+      return null;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.85,
+      allowsEditing,
+      quality,
+      allowsMultipleSelection,
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
+      if (allowsMultipleSelection) {
+        return result.assets.map((asset) => asset.uri);
+      }
       return result.assets[0].uri;
     }
     return null;
@@ -97,6 +196,10 @@ export async function pickImageFromGallery() {
 }
 
 export default {
+  checkCameraPermission,
+  requestCameraPermission,
+  checkMediaPermission,
+  requestMediaPermission,
   capturePhoto,
   pickImageFromGallery,
 };

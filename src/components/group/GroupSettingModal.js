@@ -36,8 +36,8 @@ export default function GroupSettingModal({
     },
     {
       id: 'c1',
-      name: 'Priya Sharma',
-      username: 'priya_s',
+      name: 'Sarah Jenkins',
+      username: 'sarah_j',
       avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
       isAdmin: true,
       isOnline: true,

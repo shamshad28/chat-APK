@@ -64,7 +64,7 @@ export default function RegisterForm({ onSubmit, onNavigateToLogin }) {
           <Ionicons name="person-outline" size={18} color={COLORS.iconDefault} style={styles.inputIcon} />
           <TextInput
             style={styles.textInput}
-            placeholder="e.g. Shamshad Khan"
+            placeholder="e.g. Alex Morgan"
             placeholderTextColor={COLORS.textMuted}
             value={name}
             onChangeText={(txt) => {
@@ -82,7 +82,7 @@ export default function RegisterForm({ onSubmit, onNavigateToLogin }) {
           <Ionicons name="at" size={18} color={COLORS.iconDefault} style={styles.inputIcon} />
           <TextInput
             style={styles.textInput}
-            placeholder="e.g. shamshad"
+            placeholder="e.g. alex_m"
             placeholderTextColor={COLORS.textMuted}
             value={username}
             onChangeText={(txt) => {

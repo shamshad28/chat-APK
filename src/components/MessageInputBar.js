@@ -18,6 +18,7 @@ export default function MessageInputBar({
   replyingTo,
   onCancelReply,
   onFocus,
+  isLight = false,
 }) {
   const [text, setText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -61,77 +62,64 @@ export default function MessageInputBar({
     setText('');
   };
 
-  const formatRecordTimer = (totalSeconds) => {
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  };
+  const iconColor = isLight ? '#54656f' : COLORS.iconDefault;
 
   return (
-    <View style={styles.outerContainer}>
-      {/* Replying preview banner if present */}
+    <View style={[styles.container, isLight && styles.containerLight]}>
+      {/* Quoted Replying Header Preview */}
       {replyingTo && (
-        <View style={styles.replyBanner}>
-          <View style={styles.replyBar} />
+        <View style={[styles.replyContainer, isLight && styles.replyContainerLight]}>
+          <View style={styles.replyBorder} />
           <View style={styles.replyContent}>
-            <Text style={styles.replySender}>{replyingTo.senderName}</Text>
-            <Text style={styles.replyText} numberOfLines={1}>
-              {replyingTo.text || 'Photo / Media'}
+            <Text style={styles.replySender}>{replyingTo.senderName || 'Replying to message'}</Text>
+            <Text style={[styles.replyText, isLight && styles.replyTextLight]} numberOfLines={1}>
+              {replyingTo.text || 'Photo/Media'}
             </Text>
           </View>
           <TouchableOpacity onPress={onCancelReply} style={styles.replyClose}>
-            <Ionicons name="close" size={18} color={COLORS.textSecondary} />
+            <Ionicons name="close" size={18} color={iconColor} />
           </TouchableOpacity>
         </View>
       )}
 
+      {/* Main Input Controls Row */}
       <View style={styles.inputRow}>
         {isRecording ? (
-          /* ACTIVE VOICE RECORDING CAPSULE */
-          <View style={styles.recordingCapsule}>
-            <View style={styles.recordingLeft}>
-              <View style={styles.redBlinkDot} />
-              <Ionicons name="mic" size={20} color="#ef4444" style={{ marginRight: 6 }} />
-              <Text style={styles.recordingTimerText}>{formatRecordTimer(recordSecs)}</Text>
+          /* VOICE RECORDING STRIP */
+          <View style={[styles.recordingStrip, isLight && styles.recordingStripLight]}>
+            <View style={styles.recordPill}>
+              <View style={styles.pulsingRedDot} />
+              <Text style={[styles.recordingTimerText, isLight && styles.recordingTimerTextLight]}>
+                0:{recordSecs < 10 ? '0' : ''}
+                {recordSecs}
+              </Text>
             </View>
 
-            {/* Simulated Live Audio Sound Waves */}
-            <View style={styles.liveAudioWaves}>
-              {[8, 16, 24, 14, 20, 26, 12, 18, 22, 10, 16].map((h, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.liveWaveBar,
-                    { height: h * ((recordSecs % 2 === 0 ? 1 : 0.75)) },
-                  ]}
-                />
-              ))}
-            </View>
+            <TouchableOpacity style={styles.slideCancelBtn} onPress={cancelRecording}>
+              <Text style={styles.slideCancelText}>Cancel</Text>
+              <MaterialIcons name="chevron-left" size={20} color="#ef4444" />
+            </TouchableOpacity>
 
-            {/* Cancel / Trash Button */}
-            <TouchableOpacity
-              style={styles.cancelRecordBtn}
-              onPress={cancelRecording}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="trash-outline" size={22} color="#8696a0" />
+            <TouchableOpacity style={styles.deleteRecordBtn} onPress={cancelRecording}>
+              <Ionicons name="trash-outline" size={20} color="#ef4444" />
             </TouchableOpacity>
           </View>
         ) : (
-          /* REGULAR MESSAGE INPUT CAPSULE */
-          <View style={styles.inputCapsule}>
+          /* REGULAR MESSAGE INPUT CAPSULE (Frosted Glassmorphism) */
+          <View style={[styles.inputCapsule, isLight && styles.inputCapsuleLight]}>
+            <View style={styles.glassSheen} />
             <TouchableOpacity
               style={styles.capsuleIcon}
               onPress={onToggleEmoji}
               activeOpacity={0.7}
             >
-              <Ionicons name="happy-outline" size={24} color={COLORS.iconDefault} />
+              <Ionicons name="happy-outline" size={24} color={iconColor} />
             </TouchableOpacity>
 
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, isLight && styles.textInputLight]}
               placeholder="Message"
-              placeholderTextColor={COLORS.textMuted}
+              placeholderTextColor={isLight ? '#8696a0' : COLORS.textMuted}
               value={text}
               onChangeText={setText}
               onFocus={onFocus}
@@ -144,7 +132,7 @@ export default function MessageInputBar({
               onPress={onOpenAttachment}
               activeOpacity={0.7}
             >
-              <Ionicons name="attach" size={24} color={COLORS.iconDefault} style={styles.attachRotate} />
+              <Ionicons name="attach" size={24} color={iconColor} style={styles.attachRotate} />
             </TouchableOpacity>
 
             {!text.trim() && (
@@ -153,7 +141,7 @@ export default function MessageInputBar({
                 onPress={onQuickCamera}
                 activeOpacity={0.7}
               >
-                <Feather name="camera" size={20} color={COLORS.iconDefault} />
+                <Feather name="camera" size={20} color={iconColor} />
               </TouchableOpacity>
             )}
           </View>
@@ -162,30 +150,30 @@ export default function MessageInputBar({
         {/* Dynamic Action Button: Send or Mic */}
         {isRecording ? (
           <TouchableOpacity
-            style={styles.sendButton}
+            style={[styles.sendButton, isLight && styles.sendButtonLight]}
             onPress={sendVoiceNote}
             activeOpacity={0.8}
           >
-            <Ionicons name="send" size={19} color="#111b21" style={styles.sendIconOffset} />
+            <Ionicons name="send" size={19} color={isLight ? '#ffffff' : '#111b21'} style={styles.sendIconOffset} />
           </TouchableOpacity>
         ) : text.trim() ? (
           <TouchableOpacity
-            style={styles.sendButton}
+            style={[styles.sendButton, isLight && styles.sendButtonLight]}
             onPress={handleSend}
             activeOpacity={0.8}
           >
-            <Ionicons name="send" size={19} color="#111b21" style={styles.sendIconOffset} />
+            <Ionicons name="send" size={19} color={isLight ? '#ffffff' : '#111b21'} style={styles.sendIconOffset} />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={styles.micButton}
+            style={[styles.micButton, isLight && styles.sendButtonLight]}
             onPress={startRecording}
             activeOpacity={0.8}
           >
             <Ionicons
               name="mic"
               size={22}
-              color="#111b21"
+              color={isLight ? '#ffffff' : '#111b21'}
             />
           </TouchableOpacity>
         )}
@@ -195,24 +183,34 @@ export default function MessageInputBar({
 }
 
 const styles = StyleSheet.create({
-  outerContainer: {
-    backgroundColor: COLORS.chatBackground,
+  container: {
     paddingHorizontal: 6,
-    paddingBottom: Platform.OS === 'ios' ? 12 : 8,
-    paddingTop: 6,
+    paddingTop: 4,
+    paddingBottom: Platform.OS === 'ios' ? 10 : 8,
+    backgroundColor: 'transparent',
   },
-  replyBanner: {
-    backgroundColor: '#202c33',
-    borderRadius: 8,
-    marginBottom: 6,
-    padding: 8,
+  containerLight: {},
+  replyContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    backgroundColor: 'rgba(32, 44, 51, 0.95)',
+    borderRadius: 14,
+    padding: 8,
+    marginBottom: 6,
     marginHorizontal: 4,
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2a3942',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(12px)' } : {}),
   },
-  replyBar: {
+  replyContainerLight: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  replyBorder: {
     width: 4,
     height: '100%',
     backgroundColor: COLORS.accentGreen,
@@ -224,12 +222,15 @@ const styles = StyleSheet.create({
   },
   replySender: {
     color: COLORS.accentGreen,
+    fontWeight: '700',
     fontSize: 12,
-    fontWeight: '600',
   },
   replyText: {
     color: COLORS.textSecondary,
     fontSize: 13,
+  },
+  replyTextLight: {
+    color: '#54656f',
   },
   replyClose: {
     padding: 4,
@@ -243,13 +244,33 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.headerBackground,
+    backgroundColor: 'rgba(32, 44, 51, 0.92)',
     borderRadius: 25,
     paddingHorizontal: 8,
     paddingVertical: Platform.OS === 'ios' ? 8 : 4,
     minHeight: 48,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    position: 'relative',
+    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(16px)' } : {}),
+  },
+  inputCapsuleLight: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  glassSheen: {
+    position: 'absolute',
+    top: 2,
+    left: '15%',
+    right: '15%',
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 1,
   },
   capsuleIcon: {
     padding: 6,
@@ -261,11 +282,14 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    fontSize: 16,
-    color: COLORS.textPrimary,
+    fontSize: 15,
+    color: '#e9edef',
     maxHeight: 110,
     paddingHorizontal: 6,
     paddingVertical: 4,
+  },
+  textInputLight: {
+    color: '#111b21',
   },
   sendButton: {
     width: 48,
@@ -279,6 +303,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3,
+  },
+  sendButtonLight: {
+    backgroundColor: '#00a884',
   },
   sendIconOffset: {
     marginLeft: 3,
@@ -296,50 +323,51 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3,
   },
-  micButtonActive: {
-    backgroundColor: COLORS.danger,
-    transform: [{ scale: 1.1 }],
-  },
-  recordingCapsule: {
+  recordingStrip: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1f2c34',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(32, 44, 51, 0.95)',
     borderRadius: 25,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     minHeight: 48,
     borderWidth: 1,
-    borderColor: '#2a3942',
-    justifyContent: 'space-between',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  recordingLeft: {
+  recordingStripLight: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  recordPill: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
-  redBlinkDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  pulsingRedDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: '#ef4444',
-    marginRight: 6,
   },
   recordingTimerText: {
-    color: '#ffffff',
+    color: '#e9edef',
     fontSize: 15,
     fontWeight: '600',
   },
-  liveAudioWaves: {
+  recordingTimerTextLight: {
+    color: '#111b21',
+  },
+  slideCancelBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 8,
   },
-  liveWaveBar: {
-    width: 3,
-    backgroundColor: COLORS.accentGreen,
-    borderRadius: 2,
+  slideCancelText: {
+    color: '#ef4444',
+    fontSize: 13,
+    fontWeight: '500',
   },
-  cancelRecordBtn: {
+  deleteRecordBtn: {
     padding: 6,
   },
 });

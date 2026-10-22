@@ -11,11 +11,12 @@ import { COLORS } from '../constants/theme';
 
 /**
  * Mobile Main Home Header Navbar
- * Adapts seamlessly across bottom tabs
+ * Adapts seamlessly across bottom tabs and supports Light/Dark theme with glassmorphism
  */
 export default function HomeHeaderNavbar({
   activeTab = 'chats',
   appName = 'WhatsApp',
+  isLight = false,
   onCameraPress,
   onSearchPress,
   onMenuPress,
@@ -31,21 +32,30 @@ export default function HomeHeaderNavbar({
         return 'Calls';
       case 'settings':
         return 'Settings';
+      case 'meta-ai':
+        return 'Meta AI';
       default:
         return appName;
     }
   };
 
   const isMainChats = activeTab === 'chats';
+  const iconColor = isLight ? '#ffffff' : '#aebac1';
+  const titleColor = isLight ? '#ffffff' : '#e9edef';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isLight && styles.containerLight]}>
+      {/* Specular Top Rim */}
+      <View style={[styles.glassTopRim, isLight && styles.glassTopRimLight]} />
+
       {/* Brand or Tab Title */}
       <View style={styles.brandContainer}>
         <Text
+          numberOfLines={1}
           style={[
             styles.brandTitle,
             isMainChats ? styles.brandTitleLogo : styles.brandTitleNormal,
+            { color: titleColor },
           ]}
         >
           {getTitle()}
@@ -72,7 +82,7 @@ export default function HomeHeaderNavbar({
             onPress={onCameraPress}
             activeOpacity={0.7}
           >
-            <Feather name="camera" size={20} color={COLORS.iconDefault} />
+            <Feather name="camera" size={20} color={iconColor} />
           </TouchableOpacity>
         )}
 
@@ -82,7 +92,7 @@ export default function HomeHeaderNavbar({
             onPress={onSearchPress}
             activeOpacity={0.7}
           >
-            <Ionicons name="search" size={20} color={COLORS.iconDefault} />
+            <Ionicons name="search" size={20} color={iconColor} />
           </TouchableOpacity>
         )}
 
@@ -92,7 +102,7 @@ export default function HomeHeaderNavbar({
             onPress={onMenuPress}
             activeOpacity={0.7}
           >
-            <MaterialIcons name="more-vert" size={22} color={COLORS.iconDefault} />
+            <MaterialIcons name="more-vert" size={22} color={iconColor} />
           </TouchableOpacity>
         )}
       </View>
@@ -103,13 +113,17 @@ export default function HomeHeaderNavbar({
 const styles = StyleSheet.create({
   container: {
     height: 58,
-    backgroundColor: COLORS.headerBackground,
+    backgroundColor: 'rgba(32, 44, 51, 0.92)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    position: 'relative',
+    ...(Platform.OS === 'web'
+      ? { backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }
+      : {}),
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -122,7 +136,24 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  containerLight: {
+    backgroundColor: '#008069',
+    borderBottomColor: 'rgba(0, 0, 0, 0.06)',
+  },
+  glassTopRim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  glassTopRimLight: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  },
   brandContainer: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -132,16 +163,15 @@ const styles = StyleSheet.create({
   brandTitleLogo: {
     fontSize: 21,
     fontWeight: 'bold',
-    color: COLORS.textSecondary,
   },
   brandTitleNormal: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.textPrimary,
   },
   actionsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
   },
   iconButton: {
     padding: 7,

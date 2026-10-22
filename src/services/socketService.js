@@ -1,9 +1,35 @@
 import { io } from 'socket.io-client';
 import { Platform } from 'react-native';
 
-// Default development socket URL
-// Local PC IP: 192.168.1.109
-const DEFAULT_SOCKET_URL = 'http://192.168.1.109:5000';
+// Dynamic Socket URL Resolution:
+// 1. Web -> uses current browser host:5000
+// 2. Expo / Mobile -> extracts host IP from Expo hostUri
+// 3. Current active Wi-Fi LAN IP -> 192.168.1.106:5000
+const resolveDefaultSocketUrl = () => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location?.hostname) {
+    return `http://${window.location.hostname}:5000`;
+  }
+
+  try {
+    const Constants = require('expo-constants')?.default;
+    const hostUri =
+      Constants?.expoConfig?.hostUri ||
+      Constants?.manifest2?.extra?.expoGo?.debuggerHost ||
+      Constants?.manifest?.debuggerHost;
+    if (hostUri) {
+      const hostIp = hostUri.split(':')[0];
+      if (hostIp && hostIp !== 'localhost' && hostIp !== '127.0.0.1') {
+        return `http://${hostIp}:5000`;
+      }
+    }
+  } catch (e) {
+    // expo-constants optional
+  }
+
+  return 'http://192.168.1.106:5000';
+};
+
+const DEFAULT_SOCKET_URL = resolveDefaultSocketUrl();
 
 let socket = null;
 let currentSocketUrl = DEFAULT_SOCKET_URL;
@@ -28,20 +54,37 @@ export const getSocket = () => {
       autoConnect: false,
       transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 2000,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1500,
       timeout: 10000,
     });
 
     socket.on('connect', () => {
-      console.log('✅ Socket connected to:', currentSocketUrl, 'ID:', socket.id);
+      console.log('✅ Real-time Socket connected to:', currentSocketUrl, 'ID:', socket.id);
     });
 
-    let hasWarnedError = false;
+    let hasLoggedNotice = false;
+    let fallbackTried = false;
     socket.on('connect_error', (err) => {
-      if (!hasWarnedError) {
-        console.warn('ℹ️ Optional backend server offline (running in offline demo mode):', err?.message || err);
-        hasWarnedError = true;
+      if (!fallbackTried) {
+        fallbackTried = true;
+        const fallbackUrl = Platform.OS === 'web'
+          ? 'http://localhost:5000'
+          : Platform.OS === 'android'
+          ? 'http://10.0.2.2:5000'
+          : 'http://localhost:5000';
+
+        if (currentSocketUrl !== fallbackUrl) {
+          console.log(`ℹ️ Socket retrying with fallback URL: ${fallbackUrl}`);
+          setSocketUrl(fallbackUrl);
+          const newSocket = getSocket();
+          newSocket.connect();
+          return;
+        }
+      }
+      if (!hasLoggedNotice) {
+        console.log('ℹ️ Real-time socket connecting to backend server...', err?.message || '');
+        hasLoggedNotice = true;
       }
     });
 
@@ -61,7 +104,16 @@ export const connectSocket = (user, token) => {
 
   s.auth = {
     token: token || 'demo_token_pulsechat',
-    userId: user?._id || user?.id || 'user_shamshad',
+    userId: user?._id || user?.id || 'user_guest',
+    user: user
+      ? {
+          _id: user._id || user.id,
+          id: user.id || user._id,
+          name: user.name,
+          username: user.username,
+          avatar: user.avatar,
+        }
+      : null,
   };
 
   if (!s.connected) {
@@ -70,6 +122,7 @@ export const connectSocket = (user, token) => {
 
   if (user) {
     s.emit('setup', user);
+    s.emit('user:announce', user);
   }
   return s;
 };
@@ -119,6 +172,48 @@ export const sendMarkAsRead = (conversationId) => {
   const s = getSocket();
   if (conversationId && s.connected) {
     s.emit('markAsRead', { conversationId });
+  }
+};
+
+/**
+ * Send real-time End-to-End Encrypted message to any user/location
+ */
+export const sendMessage = (messageData) => {
+  const s = getSocket();
+  if (s.connected && messageData) {
+    s.emit('chat:message', {
+      ...messageData,
+      isEncrypted: true,
+      e2ee: true,
+      timestamp: Date.now(),
+    });
+  }
+};
+
+/**
+ * Announce current logged-in or newly registered user across all devices & locations
+ */
+export const announceUser = (user) => {
+  const s = getSocket();
+  if (s.connected && user) {
+    s.emit('user:announce', {
+      id: user.id || user._id,
+      name: user.name,
+      username: user.username,
+      avatar: user.avatar,
+      phone: user.phone,
+      about: user.about || user.status || 'Available',
+    });
+  }
+};
+
+/**
+ * Request complete registered user directory from server
+ */
+export const requestRegisteredUsers = () => {
+  const s = getSocket();
+  if (s.connected) {
+    s.emit('users:requestList');
   }
 };
 
@@ -213,6 +308,9 @@ export default {
   sendTypingStart,
   sendTypingStop,
   sendMarkAsRead,
+  sendMessage,
+  announceUser,
+  requestRegisteredUsers,
   broadcastNewStatus,
   emitCallInitiate,
   emitCallAccept,

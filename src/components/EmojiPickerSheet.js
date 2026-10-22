@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { COLORS } from '../constants/theme';
 
 const EMOJIS = [
@@ -43,9 +43,15 @@ export default function EmojiPickerSheet({ visible, onSelectEmoji }) {
 const styles = StyleSheet.create({
   container: {
     height: 200,
-    backgroundColor: '#1f2c34',
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    backgroundColor: 'rgba(23, 34, 42, 0.88)',
+    borderTopWidth: 0.8,
+    borderTopColor: 'rgba(255, 255, 255, 0.16)',
+    ...(Platform.OS === 'web'
+      ? {
+          backdropFilter: 'blur(28px) saturate(200%)',
+          WebkitBackdropFilter: 'blur(28px) saturate(200%)',
+        }
+      : {}),
   },
   emojiGrid: {
     flexDirection: 'row',

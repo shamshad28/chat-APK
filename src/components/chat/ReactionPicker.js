@@ -5,6 +5,7 @@ import {
   Text,
   TouchableOpacity,
   Animated,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/theme';
@@ -102,12 +103,18 @@ const styles = StyleSheet.create({
   bubbleBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#202c33',
+    backgroundColor: 'rgba(23, 34, 42, 0.88)',
     borderRadius: 24,
     paddingHorizontal: 8,
     paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: '#2a3942',
+    borderWidth: 0.8,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    ...(Platform.OS === 'web'
+      ? {
+          backdropFilter: 'blur(28px) saturate(200%)',
+          WebkitBackdropFilter: 'blur(28px) saturate(200%)',
+        }
+      : {}),
   },
   emojiButton: {
     width: 36,

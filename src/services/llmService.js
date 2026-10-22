@@ -23,7 +23,7 @@ const KNOWLEDGE_BASE = [
   {
     triggers: ['join', 'link', 'group', 'invite'],
     response:
-      "To have a new user join a conversation or group:\n1. Open the **New Chat (+)** menu and select **'Join via Invite Code / Link'**\n2. Enter the invite code (e.g., `pulse.me/priya` or any room key)\n3. You can also share your personal **QR Code** from your Profile so anyone can scan and connect instantly!",
+      "To have a new user join a conversation or group:\n1. Open the **New Chat (+)** menu and select **'Join via Invite Code / Link'**\n2. Enter the invite code (e.g., `pulse.me/join` or any room key)\n3. You can also share your personal **QR Code** from your Profile so anyone can scan and connect instantly!",
   },
 ];
 
@@ -57,7 +57,7 @@ export async function queryLLM(prompt, context = {}) {
 
   return (
     `**Pulse LLM**: I have processed your request regarding *"${prompt}"*.\n\n` +
-    `I can help you expand this thought, draft a response to Priya Mali, or execute a technical plan. Let me know how you'd like to proceed!`
+    `I can help you expand this thought, draft a response to your contacts, or execute a technical plan. Let me know how you'd like to proceed!`
   );
 }
 

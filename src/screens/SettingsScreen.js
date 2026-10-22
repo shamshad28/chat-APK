@@ -7,64 +7,82 @@ import {
   TouchableOpacity,
   Image,
   Alert,
-  Modal,
   TextInput,
+  Modal,
   Platform,
 } from 'react-native';
-import {
-  Ionicons,
-  MaterialIcons,
-  MaterialCommunityIcons,
-  Feather,
-} from '@expo/vector-icons';
+import { Ionicons, Feather, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
-import { CURRENT_USER } from '../data/mockData';
 import QRCodeModal from '../components/profile/QRCodeModal';
+import PrivacySettingsModal from '../components/settings/PrivacySettingsModal';
+import AvatarSettingsModal from '../components/settings/AvatarSettingsModal';
+import ChatsSettingsModal from '../components/settings/ChatsSettingsModal';
+import NotificationsSettingsModal from '../components/settings/NotificationsSettingsModal';
+import AccountSettingsModal from '../components/settings/AccountSettingsModal';
+import StorageDataSettingsModal from '../components/settings/StorageDataSettingsModal';
+import HelpSettingsModal from '../components/settings/HelpSettingsModal';
+import { useTheme } from '../context/ThemeContext';
 
 export default function SettingsScreen({
+  currentUser,
   onOpenProfile,
-  onLogout,
+  onUpdateUser,
+  onClearAllChats,
   onOpenCreateGroup,
-  isSocketConnected = false,
-  socketUrl = 'http://localhost:5000',
+  onLogout,
+  isSocketConnected,
+  socketUrl,
   onUpdateSocketUrl,
+  theme,
+  onThemeChange,
+  wallpaper,
+  onWallpaperChange,
 }) {
+  const themeContext = useTheme();
+  const activeTheme = theme || themeContext.theme;
+  const isLight = activeTheme === 'Light' || themeContext.isLight;
+  const activeWallpaper = wallpaper || themeContext.chatWallpaper;
+
   const [isServerModalVisible, setIsServerModalVisible] = useState(false);
+  const [tempUrl, setTempUrl] = useState(socketUrl || 'http://192.168.1.15:5000');
   const [isQrModalVisible, setIsQrModalVisible] = useState(false);
-  const [tempUrl, setTempUrl] = useState(socketUrl);
+
+  // Settings Sub-screens Modals
+  const [isPrivacyModalVisible, setIsPrivacyModalVisible] = useState(false);
+  const [isAvatarModalVisible, setIsAvatarModalVisible] = useState(false);
+  const [isChatsModalVisible, setIsChatsModalVisible] = useState(false);
+  const [isNotificationsModalVisible, setIsNotificationsModalVisible] = useState(false);
+  const [isAccountModalVisible, setIsAccountModalVisible] = useState(false);
+  const [isStorageModalVisible, setIsStorageModalVisible] = useState(false);
+  const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
+
+  const activeUser = currentUser || {
+    name: 'PulseChat User',
+    about: 'Available',
+    avatar: null,
+  };
+
+  const handleSaveSocketUrl = () => {
+    if (onUpdateSocketUrl) {
+      onUpdateSocketUrl(tempUrl);
+    }
+    setIsServerModalVisible(false);
+    Alert.alert('Server Configured', `Updated real-time socket URL to ${tempUrl}`);
+  };
+
   const settingsOptions = [
     {
       id: 'account',
       title: 'Account',
       subtitle: 'Security notifications, change number',
       icon: 'key-outline',
-      iconFamily: 'Ionicons',
+      onPress: () => setIsAccountModalVisible(true),
     },
     {
-      id: 'profile',
-      title: 'Profile & Status',
-      subtitle: 'Edit name, username, bio, and phone',
-      icon: 'person-outline',
-      iconFamily: 'Ionicons',
-      onPress: onOpenProfile,
-    },
-    {
-      id: 'server_network',
-      title: 'Socket.IO & WebRTC Server',
-      subtitle: `${isSocketConnected ? '🟢 Connected' : '🔴 Disconnected'} • ${socketUrl}`,
-      icon: 'radio-outline',
-      iconFamily: 'Ionicons',
-      onPress: () => {
-        setTempUrl(socketUrl);
-        setIsServerModalVisible(true);
-      },
-    },
-    {
-      id: 'new_group',
+      id: 'group',
       title: 'New Group',
-      subtitle: 'Create group with participants and subject',
+      subtitle: 'Create a group with friends or team',
       icon: 'people-outline',
-      iconFamily: 'Ionicons',
       onPress: onOpenCreateGroup,
     },
     {
@@ -72,110 +90,151 @@ export default function SettingsScreen({
       title: 'Privacy',
       subtitle: 'Block contacts, disappearing messages',
       icon: 'lock-closed-outline',
-      iconFamily: 'Ionicons',
+      onPress: () => setIsPrivacyModalVisible(true),
     },
     {
       id: 'avatar',
       title: 'Avatar',
       subtitle: 'Create, edit, profile photo',
       icon: 'happy-outline',
-      iconFamily: 'Ionicons',
+      onPress: () => setIsAvatarModalVisible(true),
     },
     {
       id: 'chats',
       title: 'Chats',
-      subtitle: 'Theme, wallpapers, chat history',
+      subtitle: `Theme: ${activeTheme} • Wallpaper & history`,
       icon: 'chatbox-ellipses-outline',
-      iconFamily: 'Ionicons',
+      onPress: () => setIsChatsModalVisible(true),
     },
     {
       id: 'notifications',
       title: 'Notifications',
       subtitle: 'Message, group & call tones',
       icon: 'notifications-outline',
-      iconFamily: 'Ionicons',
+      onPress: () => setIsNotificationsModalVisible(true),
     },
     {
       id: 'storage',
       title: 'Storage and Data',
       subtitle: 'Network usage, auto-download',
       icon: 'pie-chart-outline',
-      iconFamily: 'Ionicons',
+      onPress: () => setIsStorageModalVisible(true),
     },
     {
       id: 'help',
       title: 'Help',
       subtitle: 'Help center, contact us, privacy policy',
       icon: 'help-circle-outline',
-      iconFamily: 'Ionicons',
+      onPress: () => setIsHelpModalVisible(true),
     },
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isLight && styles.containerLight]}>
+      {/* Ambient Glass Glow Orbs */}
+      <View style={styles.ambientGlowEmerald} pointerEvents="none" />
+      <View style={styles.ambientGlowCyan} pointerEvents="none" />
+
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Profile Card */}
+        {/* Profile Glass Card */}
         <TouchableOpacity
-          style={styles.profileCard}
+          style={[styles.profileCard, isLight && styles.profileCardLight]}
           onPress={onOpenProfile}
-          activeOpacity={0.7}
+          activeOpacity={0.75}
         >
-          <Image source={{ uri: CURRENT_USER.avatar }} style={styles.profileAvatar} />
+          <View style={styles.glassSheen} />
+          {activeUser.avatar ? (
+            <Image source={{ uri: activeUser.avatar }} style={styles.profileAvatar} />
+          ) : (
+            <View style={styles.profileAvatarPlaceholder}>
+              <Text style={styles.profileAvatarInitial}>
+                {activeUser.name ? activeUser.name.charAt(0).toUpperCase() : 'U'}
+              </Text>
+            </View>
+          )}
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{CURRENT_USER.name}</Text>
+            <Text style={[styles.profileName, isLight && styles.profileNameLight]}>
+              {activeUser.name}
+            </Text>
             <Text style={styles.profileAbout} numberOfLines={1}>
-              {CURRENT_USER.about || 'Available'}
+              {activeUser.about || activeUser.email || 'Available'}
             </Text>
           </View>
           <TouchableOpacity
-            style={styles.qrButton}
+            style={[styles.qrButton, isLight && styles.qrButtonLight]}
             onPress={() => setIsQrModalVisible(true)}
+            activeOpacity={0.7}
           >
-            <Ionicons name="qr-code-outline" size={24} color={COLORS.accentGreen} />
+            <Ionicons name="qr-code-outline" size={22} color={COLORS.accentGreen} />
           </TouchableOpacity>
         </TouchableOpacity>
 
-        <View style={styles.divider} />
-
-        {/* Settings Options List */}
-        {settingsOptions.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.optionRow}
-            onPress={
-              item.onPress
-                ? item.onPress
-                : () => Alert.alert(item.title, `Configuring ${item.title} settings`)
-            }
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={item.icon}
-              size={22}
-              color={COLORS.iconDefault}
-              style={styles.optionIcon}
-            />
-            <View style={styles.optionTextContainer}>
-              <Text style={styles.optionTitle}>{item.title}</Text>
-              {Boolean(item.subtitle) && (
-                <Text style={styles.optionSubtitle}>{item.subtitle}</Text>
-              )}
-            </View>
-          </TouchableOpacity>
-        ))}
-
-        {/* Log out Row */}
+        {/* Server Connection Status Chip */}
         <TouchableOpacity
-          style={[styles.optionRow, { marginTop: 10, borderTopWidth: 1, borderTopColor: COLORS.border }]}
-          onPress={onLogout}
-          activeOpacity={0.7}
+          style={[styles.serverChip, isLight && styles.serverChipLight]}
+          onPress={() => setIsServerModalVisible(true)}
+          activeOpacity={0.75}
         >
-          <Ionicons
-            name="log-out-outline"
-            size={22}
-            color="#ef4444"
-            style={styles.optionIcon}
+          <View
+            style={[
+              styles.statusPulseDot,
+              { backgroundColor: isSocketConnected ? '#22c55e' : '#ef4444' },
+            ]}
           />
+          <Text style={[styles.serverChipText, isLight && styles.serverChipTextLight]} numberOfLines={1}>
+            Signaling Server: <Text style={{ color: COLORS.accentGreen, fontWeight: '700' }}>
+              {isSocketConnected ? 'Connected' : 'Offline (Tap to configure)'}
+            </Text>
+          </Text>
+          <Ionicons name="settings-sharp" size={14} color={isLight ? '#54656f' : '#8696a0'} />
+        </TouchableOpacity>
+
+        {/* Grouped Settings Options in Frosted Glass Container */}
+        <View style={[styles.optionsGroupContainer, isLight && styles.optionsGroupContainerLight]}>
+          <View style={styles.glassSheen} />
+          {settingsOptions.map((item, index) => (
+            <TouchableOpacity
+              key={item.id}
+              style={[
+                styles.optionRow,
+                index > 0 && [styles.optionDivider, isLight && styles.optionDividerLight],
+              ]}
+              onPress={
+                item.onPress
+                  ? item.onPress
+                  : () => Alert.alert(item.title, `Configuring ${item.title} settings`)
+              }
+              activeOpacity={0.7}
+            >
+              <View style={[styles.optionIconWrapper, isLight && styles.optionIconWrapperLight]}>
+                <Ionicons
+                  name={item.icon}
+                  size={20}
+                  color={isLight ? '#008069' : COLORS.accentGreen}
+                />
+              </View>
+              <View style={styles.optionTextContainer}>
+                <Text style={[styles.optionTitle, isLight && styles.optionTitleLight]}>
+                  {item.title}
+                </Text>
+                {Boolean(item.subtitle) && (
+                  <Text style={styles.optionSubtitle}>{item.subtitle}</Text>
+                )}
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={isLight ? '#8696a0' : '#8696a0'} />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Log out Card */}
+        <TouchableOpacity
+          style={[styles.logoutCard, isLight && styles.logoutCardLight]}
+          onPress={onLogout}
+          activeOpacity={0.75}
+        >
+          <View style={styles.logoutIconWrapper}>
+            <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+          </View>
           <View style={styles.optionTextContainer}>
             <Text style={[styles.optionTitle, { color: '#ef4444' }]}>Log out</Text>
             <Text style={styles.optionSubtitle}>Sign out of your account on this device</Text>
@@ -185,7 +244,7 @@ export default function SettingsScreen({
         {/* Footer Branding */}
         <View style={styles.footerBranding}>
           <Text style={styles.fromMetaText}>from</Text>
-          <Text style={styles.metaBrandText}>Meta</Text>
+          <Text style={styles.metaBrandText}>PulseChat • Meta</Text>
         </View>
       </ScrollView>
 
@@ -197,10 +256,10 @@ export default function SettingsScreen({
         onRequestClose={() => setIsServerModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, isLight && styles.modalContentLight]}>
             <View style={styles.modalHeader}>
               <Ionicons name="server-outline" size={24} color={COLORS.accentGreen} />
-              <Text style={styles.modalTitle}>Backend Server URL</Text>
+              <Text style={[styles.modalTitle, isLight && styles.modalTitleLight]}>Backend Server URL</Text>
             </View>
 
             <Text style={styles.modalDescription}>
@@ -214,13 +273,13 @@ export default function SettingsScreen({
                   { backgroundColor: isSocketConnected ? '#22c55e' : '#ef4444' },
                 ]}
               />
-              <Text style={styles.statusIndicatorText}>
+              <Text style={[styles.statusIndicatorText, isLight && styles.statusIndicatorTextLight]}>
                 {isSocketConnected ? 'Connected to Socket Server' : 'Disconnected (Check server status)'}
               </Text>
             </View>
 
             <TextInput
-              style={styles.urlInput}
+              style={[styles.urlInput, isLight && styles.urlInputLight]}
               value={tempUrl}
               onChangeText={setTempUrl}
               placeholder="e.g. http://192.168.1.15:5000"
@@ -230,42 +289,18 @@ export default function SettingsScreen({
               keyboardType="url"
             />
 
-            {/* Quick Presets */}
-            <Text style={styles.presetsLabel}>Quick Presets:</Text>
-            <View style={styles.presetsContainer}>
-              <TouchableOpacity
-                style={styles.presetChip}
-                onPress={() => setTempUrl('http://10.0.2.2:5000')}
-              >
-                <Text style={styles.presetChipText}>Android (10.0.2.2:5000)</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.presetChip}
-                onPress={() => setTempUrl('http://localhost:5000')}
-              >
-                <Text style={styles.presetChipText}>iOS/Web (localhost:5000)</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Action Buttons */}
             <View style={styles.modalButtonRow}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+                style={styles.cancelBtn}
                 onPress={() => setIsServerModalVisible(false)}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={() => {
-                  if (onUpdateSocketUrl) {
-                    onUpdateSocketUrl(tempUrl.trim());
-                  }
-                  setIsServerModalVisible(false);
-                  Alert.alert('Server Updated', `Connecting to ${tempUrl.trim()}`);
-                }}
+                style={styles.saveBtn}
+                onPress={handleSaveSocketUrl}
               >
-                <Text style={styles.saveButtonText}>Connect</Text>
+                <Text style={styles.saveBtnText}>Save URL</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -276,8 +311,66 @@ export default function SettingsScreen({
       <QRCodeModal
         visible={isQrModalVisible}
         onClose={() => setIsQrModalVisible(false)}
-        user={CURRENT_USER}
+        user={activeUser}
         onJoinUser={onOpenProfile}
+      />
+
+      {/* Privacy Settings Modal */}
+      <PrivacySettingsModal
+        visible={isPrivacyModalVisible}
+        onClose={() => setIsPrivacyModalVisible(false)}
+      />
+
+      {/* Avatar Settings Modal */}
+      <AvatarSettingsModal
+        visible={isAvatarModalVisible}
+        onClose={() => setIsAvatarModalVisible(false)}
+        currentUser={activeUser}
+        onUpdateUser={onUpdateUser}
+      />
+
+      {/* Chats Settings Modal */}
+      <ChatsSettingsModal
+        visible={isChatsModalVisible}
+        onClose={() => setIsChatsModalVisible(false)}
+        onClearAllChats={onClearAllChats}
+        currentTheme={activeTheme}
+        onThemeChange={(t) => {
+          if (onThemeChange) onThemeChange(t);
+          if (themeContext.setTheme) themeContext.setTheme(t);
+        }}
+        currentWallpaper={activeWallpaper}
+        onWallpaperChange={(wp) => {
+          if (onWallpaperChange) onWallpaperChange(wp);
+          if (themeContext.setWallpaper) themeContext.setWallpaper(wp);
+        }}
+      />
+
+      {/* Notifications Settings Modal */}
+      <NotificationsSettingsModal
+        visible={isNotificationsModalVisible}
+        onClose={() => setIsNotificationsModalVisible(false)}
+      />
+
+      {/* Account Settings Modal */}
+      <AccountSettingsModal
+        visible={isAccountModalVisible}
+        onClose={() => setIsAccountModalVisible(false)}
+        currentUser={activeUser}
+        onLogout={onLogout}
+        onUpdateUser={onUpdateUser}
+      />
+
+      {/* Storage & Data Settings Modal */}
+      <StorageDataSettingsModal
+        visible={isStorageModalVisible}
+        onClose={() => setIsStorageModalVisible(false)}
+      />
+
+      {/* Help Settings Modal */}
+      <HelpSettingsModal
+        visible={isHelpModalVisible}
+        onClose={() => setIsHelpModalVisible(false)}
       />
     </View>
   );
@@ -286,193 +379,353 @@ export default function SettingsScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#070d10',
+    position: 'relative',
+  },
+  containerLight: {
+    backgroundColor: '#f0f2f5',
+  },
+  ambientGlowEmerald: {
+    position: 'absolute',
+    top: -40,
+    left: -40,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: 'rgba(0, 168, 132, 0.12)',
+    ...(Platform.OS === 'web' ? { filter: 'blur(70px)' } : {}),
+  },
+  ambientGlowCyan: {
+    position: 'absolute',
+    bottom: 80,
+    right: -40,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(56, 189, 248, 0.08)',
+    ...(Platform.OS === 'web' ? { filter: 'blur(60px)' } : {}),
   },
   scrollContent: {
-    paddingBottom: 40,
+    padding: 16,
+    paddingBottom: 90,
+  },
+  glassSheen: {
+    position: 'absolute',
+    top: 2,
+    left: '12%',
+    right: '12%',
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    borderRadius: 1,
   },
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: COLORS.headerBackground,
+    padding: 16,
+    borderRadius: 18,
+    backgroundColor: 'rgba(20, 31, 38, 0.76)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.09)',
+    marginBottom: 14,
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(16px)' } : {}),
+  },
+  profileCardLight: {
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
   },
   profileAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     marginRight: 14,
+    borderWidth: 2,
+    borderColor: COLORS.accentGreen,
+  },
+  profileAvatarPlaceholder: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: 'rgba(0, 168, 132, 0.25)',
+    borderWidth: 1.5,
+    borderColor: COLORS.accentGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  profileAvatarInitial: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: COLORS.accentGreen,
   },
   profileInfo: {
     flex: 1,
   },
   profileName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#e9edef',
     marginBottom: 4,
+  },
+  profileNameLight: {
+    color: '#111b21',
   },
   profileAbout: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
+    fontSize: 12.5,
+    color: '#8696a0',
   },
   qrButton: {
-    padding: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 168, 132, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 168, 132, 0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.border,
-    marginBottom: 4,
+  qrButtonLight: {
+    backgroundColor: 'rgba(0, 168, 132, 0.1)',
+  },
+  serverChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(20, 31, 38, 0.65)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
+    gap: 8,
+    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(10px)' } : {}),
+  },
+  serverChipLight: {
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    borderColor: 'rgba(0, 0, 0, 0.06)',
+  },
+  statusPulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  serverChipText: {
+    flex: 1,
+    fontSize: 11.5,
+    color: '#8696a0',
+  },
+  serverChipTextLight: {
+    color: '#54656f',
+  },
+  optionsGroupContainer: {
+    backgroundColor: 'rgba(20, 31, 38, 0.72)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 14,
+    overflow: 'hidden',
+    position: 'relative',
+    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(16px)' } : {}),
+  },
+  optionsGroupContainerLight: {
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
   },
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  optionIcon: {
-    width: 28,
-    marginRight: 18,
+  optionDivider: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  optionDividerLight: {
+    borderTopColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  optionIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0, 168, 132, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  optionIconWrapperLight: {
+    backgroundColor: 'rgba(0, 168, 132, 0.1)',
   },
   optionTextContainer: {
     flex: 1,
   },
   optionTitle: {
-    fontSize: 16,
-    color: COLORS.textPrimary,
-    fontWeight: '500',
+    fontSize: 15,
+    color: '#e9edef',
+    fontWeight: '600',
+  },
+  optionTitleLight: {
+    color: '#111b21',
   },
   optionSubtitle: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
+    fontSize: 12,
+    color: '#8696a0',
     marginTop: 2,
+  },
+  logoutCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(20, 31, 38, 0.72)',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+    marginBottom: 18,
+    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(12px)' } : {}),
+  },
+  logoutCardLight: {
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  logoutIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
   },
   footerBranding: {
     alignItems: 'center',
-    marginTop: 24,
+    marginTop: 10,
     marginBottom: 16,
   },
   fromMetaText: {
-    fontSize: 12,
-    color: COLORS.textMuted,
+    fontSize: 11,
+    color: '#8696a0',
   },
   metaBrandText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: 'bold',
-    color: COLORS.textPrimary,
+    color: COLORS.accentGreen,
     letterSpacing: 0.5,
+    marginTop: 2,
   },
+
+  // Modal Overlay
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   modalContent: {
     width: '100%',
-    backgroundColor: COLORS.cardBackground,
+    maxWidth: 420,
+    backgroundColor: '#1f2c34',
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  modalContentLight: {
+    backgroundColor: '#ffffff',
+    borderColor: 'rgba(0, 0, 0, 0.1)',
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
     marginBottom: 12,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
-    marginLeft: 10,
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#e9edef',
+  },
+  modalTitleLight: {
+    color: '#111b21',
   },
   modalDescription: {
     fontSize: 13,
-    color: COLORS.textSecondary,
+    color: '#8696a0',
     lineHeight: 18,
     marginBottom: 14,
   },
   statusIndicatorRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
     marginBottom: 14,
-    padding: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 8,
   },
   statusDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    marginRight: 8,
   },
   statusIndicatorText: {
     fontSize: 12,
-    color: COLORS.textPrimary,
-    fontWeight: '500',
+    color: '#8696a0',
+  },
+  statusIndicatorTextLight: {
+    color: '#54656f',
   },
   urlInput: {
-    backgroundColor: COLORS.headerBackground,
+    backgroundColor: '#111b21',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: COLORS.textPrimary,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#e9edef',
     fontSize: 14,
-    marginBottom: 14,
-  },
-  presetsLabel: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    marginBottom: 8,
-  },
-  presetsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
     marginBottom: 18,
   },
-  presetChip: {
-    backgroundColor: 'rgba(37, 211, 102, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(37, 211, 102, 0.3)',
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  presetChipText: {
-    color: COLORS.accentGreen,
-    fontSize: 11,
-    fontWeight: '500',
+  urlInputLight: {
+    backgroundColor: '#f0f2f5',
+    borderColor: 'rgba(0, 0, 0, 0.15)',
+    color: '#111b21',
   },
   modalButtonRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 12,
   },
-  modalButton: {
+  cancelBtn: {
+    paddingVertical: 8,
     paddingHorizontal: 16,
-    paddingVertical: 10,
     borderRadius: 8,
   },
-  cancelButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  cancelButtonText: {
-    color: COLORS.textSecondary,
+  cancelBtnText: {
+    color: '#8696a0',
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
-  saveButton: {
+  saveBtn: {
     backgroundColor: COLORS.accentGreen,
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 8,
   },
-  saveButtonText: {
-    color: '#0b141a',
+  saveBtnText: {
+    color: '#111b21',
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '700',
+  },
+  scrollContent: {
+    paddingBottom: 110,
   },
 });

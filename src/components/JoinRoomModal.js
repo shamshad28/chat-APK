@@ -50,11 +50,11 @@ export default function JoinRoomModal({
 
   const QUICK_ROOMS = [
     {
-      id: 'room_priya',
-      code: 'priya_mali_direct',
-      name: 'Priya Mali (Direct Room)',
-      desc: 'Instant 1-on-1 WebRTC & Chat room',
-      icon: 'person',
+      id: 'room_general',
+      code: 'general_pulse_room',
+      name: 'General Chat Room',
+      desc: 'Instant WebRTC & Real-time chat room',
+      icon: 'chatbubbles',
       color: '#00a884',
     },
     {

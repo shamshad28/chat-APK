@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Alert, BackHandler, Platform } from 'react-native';
+import { StyleSheet, View, Alert, BackHandler, Platform, useColorScheme } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
   SafeAreaProvider,
@@ -7,8 +7,9 @@ import {
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 
-import { COLORS } from './src/constants/theme';
-import { INITIAL_CONVERSATIONS, CURRENT_USER } from './src/data/mockData';
+import { COLORS, resolveTheme } from './src/constants/theme';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { INITIAL_CONVERSATIONS, CURRENT_USER, MOCK_CALLS } from './src/data/mockData';
 
 // Navbars & Bottom Tab
 import HomeHeaderNavbar from './src/components/HomeHeaderNavbar';
@@ -25,6 +26,7 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import CreateGroupScreen from './src/screens/CreateGroupScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
+import MetaAIScreen from './src/screens/MetaAIScreen';
 
 // Modals & New Components
 import ContactInfoModal from './src/components/ContactInfoModal';
@@ -38,8 +40,12 @@ import QRCodeModal from './src/components/profile/QRCodeModal';
 import NotificationBanner from './src/components/chat/NotificationBanner';
 import WhatsAppTitleBar from './src/components/chat/WhatsAppTitleBar';
 
-// Camera & Socket Services
+// Camera, Linking, Notification & Socket Services
 import cameraService from './src/services/cameraService';
+import linkingService from './src/services/linkingService';
+import notificationService from './src/services/notificationService';
+import storageService, { INITIAL_REGISTERED_USERS } from './src/services/storageService';
+import socketService from './src/services/socketService';
 import useSocketWebRTC from './src/hooks/useSocketWebRTC';
 
 function MainApp() {
@@ -48,7 +54,7 @@ function MainApp() {
   // Authentication State (Only authenticated users or newly created accounts can access app)
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [registeredUsers, setRegisteredUsers] = useState([CURRENT_USER]);
+  const [registeredUsers, setRegisteredUsers] = useState(INITIAL_REGISTERED_USERS);
 
   // Screen View Routing: 'main' | 'profile' | 'createGroup' | 'login' | 'register'
   const [currentView, setCurrentView] = useState('main');
@@ -57,6 +63,53 @@ function MainApp() {
   const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'updates' | 'communities' | 'calls' | 'settings'
   const [conversations, setConversations] = useState(INITIAL_CONVERSATIONS);
   const [selectedConversation, setSelectedConversation] = useState(null);
+
+  // App Theme & Wallpaper State from ThemeContext
+  const {
+    theme: appTheme,
+    setTheme: handleThemeChange,
+    chatWallpaper,
+    setWallpaper: handleWallpaperChange,
+    colors: activeColors,
+    isLight,
+  } = useTheme();
+
+  // Load persisted user session, registered users, conversations, and settings on app launch
+  useEffect(() => {
+    (async () => {
+      try {
+        const [savedUser, savedRegistered, savedConvs, savedSettings] = await Promise.all([
+          storageService.getCurrentUser(),
+          storageService.getRegisteredUsers(),
+          storageService.getConversations(),
+          storageService.getSettings(),
+        ]);
+
+        if (savedRegistered && savedRegistered.length > 0) {
+          setRegisteredUsers(savedRegistered);
+        }
+
+        if (savedConvs && savedConvs.length > 0) {
+          setConversations(savedConvs);
+        }
+
+        if (savedUser) {
+          setCurrentUser(savedUser);
+          setIsAuthenticated(true);
+        }
+
+        if (savedSettings?.chats?.theme) {
+          handleThemeChange(savedSettings.chats.theme);
+        }
+
+        if (savedSettings?.chats?.wallpaper) {
+          handleWallpaperChange(savedSettings.chats.wallpaper);
+        }
+      } catch (err) {
+        console.warn('Error loading persisted storage:', err);
+      }
+    })();
+  }, []);
 
   // Modals state
   const [isContactProfileVisible, setIsContactProfileVisible] = useState(false);
@@ -92,6 +145,205 @@ function MainApp() {
     socketUrl,
     updateSocketUrl,
   } = useSocketWebRTC(isAuthenticated ? currentUser : null);
+
+  // Live Call Badge Count (Always dynamic based on live calls; never hardcoded)
+  const [liveCallCount, setLiveCallCount] = useState(0);
+
+  useEffect(() => {
+    if (callState?.callStatus === 'incoming' || manualIncomingCall) {
+      setLiveCallCount((prev) => prev + 1);
+    }
+  }, [callState?.callStatus, manualIncomingCall]);
+
+  useEffect(() => {
+    if (activeTab === 'calls') {
+      setLiveCallCount(0);
+    }
+  }, [activeTab]);
+
+  // Real-time user announcement, cross-device discovery, and live message delivery
+  useEffect(() => {
+    if (!isAuthenticated || !currentUser) return;
+
+    const socket = socketService.getSocket();
+
+    // 1. Announce current user so all clients can discover them
+    socketService.announceUser(currentUser);
+    socketService.requestRegisteredUsers();
+
+    // 2. Cross-device contact discovery when another user registers or logs in anywhere
+    const handleUserJoined = (newContact) => {
+      if (!newContact || newContact.id === currentUser.id) return;
+      setRegisteredUsers((prev) => {
+        const exists = prev.some(
+          (u) =>
+            u.id === newContact.id ||
+            (u.username && u.username.toLowerCase() === newContact.username?.toLowerCase())
+        );
+        let updated;
+        if (exists) {
+          updated = prev.map((u) => (u.id === newContact.id ? { ...u, ...newContact, isOnline: true } : u));
+        } else {
+          updated = [...prev, { ...newContact, isOnline: true }];
+        }
+        storageService.setRegisteredUsers(updated);
+        return updated;
+      });
+    };
+
+    // 3. Receive full user list from server directory
+    const handleUsersList = (userList) => {
+      if (!Array.isArray(userList)) return;
+      setRegisteredUsers((prev) => {
+        const map = new Map();
+        prev.forEach((u) => map.set(u.id || u.username, u));
+        userList.forEach((u) => {
+          if (u.id !== currentUser.id && u.name?.toLowerCase() !== currentUser.name?.toLowerCase()) {
+            map.set(u.id || u.username, { ...map.get(u.id || u.username), ...u });
+          }
+        });
+        const merged = Array.from(map.values());
+        storageService.setRegisteredUsers(merged);
+        return merged;
+      });
+    };
+
+    // 4. Global real-time message delivery across all locations
+    const handleGlobalMessage = (msg) => {
+      if (!msg) return;
+      const myId = currentUser.id || currentUser._id;
+      const senderId = msg.sender?._id || msg.sender?.id || msg.sender;
+      if (myId && senderId && senderId === myId) return;
+
+      const senderName = msg.senderName || msg.sender?.name || 'Contact';
+      const convId =
+        msg.conversationId ||
+        (msg.conversation?._id || msg.conversation) ||
+        `conv_${senderName.toLowerCase().replace(/\s+/g, '_')}`;
+
+      // Update conversations list
+      setConversations((prev) => {
+        const existingIdx = prev.findIndex(
+          (c) => c.id === convId || c.name?.toLowerCase() === senderName.toLowerCase()
+        );
+        const isCurrentOpen =
+          selectedConversation &&
+          (selectedConversation.id === convId ||
+            selectedConversation.name?.toLowerCase() === senderName.toLowerCase());
+
+        let updated;
+        if (existingIdx >= 0) {
+          updated = [...prev];
+          const existing = updated[existingIdx];
+          updated[existingIdx] = {
+            ...existing,
+            lastMessage: {
+              text: msg.text || msg.content || 'Message',
+              time: msg.time || 'Just now',
+              isSentByMe: false,
+              status: 'read',
+            },
+            unreadCount: isCurrentOpen ? 0 : (existing.unreadCount || 0) + 1,
+          };
+          const [moved] = updated.splice(existingIdx, 1);
+          updated.unshift(moved);
+        } else {
+          const newConv = {
+            id: convId,
+            name: senderName,
+            type: 'direct',
+            avatar: msg.sender?.avatar || null,
+            isOnline: true,
+            lastSeen: 'online',
+            lastMessage: {
+              text: msg.text || msg.content || 'Message',
+              time: msg.time || 'Just now',
+              isSentByMe: false,
+              status: 'read',
+            },
+            unreadCount: isCurrentOpen ? 0 : 1,
+            isPinned: false,
+            isMuted: false,
+          };
+          updated = [newConv, ...prev];
+        }
+        storageService.setConversations(updated);
+        return updated;
+      });
+
+      // Show in-app notification toast if not currently viewing this chat
+      const isCurrentOpen =
+        selectedConversation &&
+        (selectedConversation.id === convId ||
+          selectedConversation.name?.toLowerCase() === senderName.toLowerCase());
+      if (!isCurrentOpen) {
+        notificationService.showNotification({
+          title: `🔒 ${senderName}`,
+          message: msg.text || msg.content || 'Sent a new message',
+        });
+      }
+    };
+
+    socket.on('user:joined', handleUserJoined);
+    socket.on('users:list', handleUsersList);
+    socket.on('newMessage', handleGlobalMessage);
+    socket.on('chat:incoming', handleGlobalMessage);
+
+    return () => {
+      socket.off('user:joined', handleUserJoined);
+      socket.off('users:list', handleUsersList);
+      socket.off('newMessage', handleGlobalMessage);
+      socket.off('chat:incoming', handleGlobalMessage);
+    };
+  }, [isAuthenticated, currentUser, selectedConversation]);
+
+  // Deep Linking & Push Notifications Setup
+  useEffect(() => {
+    // 1. Subscribe to in-app notification toasts
+    const unsubNotification = notificationService.subscribe((notif) => {
+      setActiveNotification(notif);
+    });
+
+    // 2. Request notification permissions
+    notificationService.requestPermissions();
+
+    // 3. Setup Deep Linking listener (pulsechat://...)
+    const cleanupLinking = linkingService.initDeepLinking((parsed) => {
+      if (!parsed) return;
+      const { route, id, queryParams } = parsed;
+
+      if (route === 'chat') {
+        const found = conversations.find(
+          (c) => c.id === id || c.name?.toLowerCase() === id?.toLowerCase()
+        );
+        if (found) {
+          handleSelectConversation(found);
+        } else if (id) {
+          handleStartNewChatWithContact({ name: id, isOnline: true });
+        }
+      } else if (route === 'call') {
+        const contactName = id || queryParams?.contact || 'Contact';
+        const cType = queryParams?.type === 'voice' ? 'voice' : 'video';
+        handleStartCall({ name: contactName }, cType);
+      } else if (route === 'tab') {
+        const targetTab = id || 'chats';
+        if (['chats', 'updates', 'communities', 'calls', 'settings'].includes(targetTab)) {
+          setSelectedConversation(null);
+          setActiveTab(targetTab);
+          setCurrentView('main');
+        }
+      } else if (route === 'profile') {
+        setCurrentView('profile');
+      } else if (route === 'createGroup') {
+        setCurrentView('createGroup');
+      }
+    });
+
+    return () => {
+      unsubNotification();
+      cleanupLinking();
+    };
+  }, [conversations]);
 
   // Android Hardware Back Button Handler
   useEffect(() => {
@@ -174,15 +426,32 @@ function MainApp() {
       conversationId: contact.id || `conv_${contact.name}`,
       callType: type,
     });
+
+    const convId = contact.id || `conv_${contact.name}`;
+    const callMsg = {
+      id: `call_${Date.now()}`,
+      type: 'call',
+      callType: type,
+      callStatus: 'calling',
+      duration: 0,
+      durationText: 'Calling...',
+      text: type === 'video' ? '📹 Outgoing video call' : '📞 Outgoing voice call',
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isSentByMe: true,
+      status: 'delivered',
+      senderName: 'You',
+    };
+    storageService.appendMessage(convId, callMsg);
+    handleMessageSent(convId, callMsg);
   };
 
   // Simulate an incoming call for testing
   const handleSimulateIncomingCall = (callerUser, type = 'video') => {
     setManualIncomingCall({
       caller: callerUser || {
-        name: 'Priya Mali',
-        username: 'priya_m',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+        name: 'Alex Johnson',
+        username: 'alex_j',
+        avatar: null,
       },
       callType: type,
     });
@@ -202,8 +471,12 @@ function MainApp() {
   };
 
   // Start new chat from contacts list
-  const handleStartNewChatWithContact = (contact) => {
-    const existing = conversations.find((c) => c.name === contact.name);
+  const handleStartNewChatWithContact = async (contact) => {
+    const existing = conversations.find(
+      (c) =>
+        c.name?.toLowerCase() === contact.name?.toLowerCase() ||
+        (contact.id && c.id === contact.id)
+    );
     if (existing) {
       handleSelectConversation(existing);
     } else {
@@ -211,8 +484,8 @@ function MainApp() {
         id: `conv_${Date.now()}`,
         name: contact.name,
         type: 'direct',
-        avatar: null,
-        isOnline: contact.isOnline,
+        avatar: contact.avatar || null,
+        isOnline: contact.isOnline !== undefined ? contact.isOnline : true,
         lastSeen: contact.isOnline ? 'online' : 'offline',
         lastMessage: {
           text: 'Started new conversation',
@@ -223,40 +496,104 @@ function MainApp() {
         unreadCount: 0,
         isPinned: false,
         isMuted: false,
-        about: contact.status,
+        about: contact.status || contact.about || 'Available',
       };
-      setConversations((prev) => [newConv, ...prev]);
-      setSelectedConversation(newConv);
+      const updatedList = [newConv, ...conversations];
+      setConversations(updatedList);
+      await storageService.setConversations(updatedList);
+      handleSelectConversation(newConv);
     }
   };
 
-  // Open or create Pulse LLM AI Assistant conversation
-  const handleOpenLLM = () => {
-    let llmConv = conversations.find((c) => c.isLLM || c.id === 'conv_llm');
-    if (!llmConv) {
-      llmConv = {
-        id: 'conv_llm',
-        name: 'Pulse LLM',
-        type: 'ai',
-        isLLM: true,
-        avatar: null,
-        isOnline: true,
-        lastSeen: 'AI Assistant • LLaMA 3.3',
-        lastMessage: {
-          text: 'Hello! I am Pulse LLM. Ask me anything, write code, or consult me on this chat.',
-          time: 'Just now',
-          senderId: 'pulse_llm',
-          isSentByMe: false,
-          status: 'read',
-        },
-        unreadCount: 0,
-        isPinned: true,
-        isMuted: false,
-        about: 'Autonomous AI Assistant powered by multimodal LLM',
-      };
-      setConversations((prev) => [llmConv, ...prev]);
+  // Update profile handler (persisted across storage and registered users)
+  const handleUpdateProfile = async (updatedData) => {
+    const updated = { ...currentUser, ...updatedData };
+    setCurrentUser(updated);
+    await storageService.setCurrentUser(updated);
+    setRegisteredUsers((prev) => {
+      const newList = prev.map((u) => (u.id === updated.id ? updated : u));
+      storageService.setRegisteredUsers(newList);
+      return newList;
+    });
+  };
+
+  // Register success handler (persisted across storage & announced worldwide)
+  const handleRegisterSuccess = async (newUser) => {
+    const updatedUsers = await storageService.addRegisteredUser(newUser);
+    await storageService.setCurrentUser(newUser);
+    setRegisteredUsers(updatedUsers);
+    setCurrentUser(newUser);
+    setIsAuthenticated(true);
+    setCurrentView('main');
+    socketService.announceUser(newUser);
+    socketService.requestRegisteredUsers();
+  };
+
+  // Login success handler (persisted across storage & announced worldwide)
+  const handleLoginSuccess = async (user) => {
+    await storageService.setCurrentUser(user);
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+    setCurrentView('main');
+    socketService.announceUser(user);
+    socketService.requestRegisteredUsers();
+  };
+
+  // Message sent in chat handler (updates last message in real-time)
+  const handleMessageSent = (param1, param2) => {
+    const convId = param2 ? param1 : (selectedConversation?.id || param1?.conversationId);
+    const msg = param2 || param1;
+    if (!convId || !msg) return;
+    setConversations((prev) => {
+      const updated = prev.map((c) => {
+        if (c.id === convId) {
+          return {
+            ...c,
+            lastMessage: {
+              text:
+                msg.text ||
+                (msg.type === 'image'
+                  ? 'Photo 📸'
+                  : msg.type === 'audio'
+                  ? 'Voice message 🎤'
+                  : 'Message'),
+              time: 'Just now',
+              isSentByMe: Boolean(msg.isSentByMe),
+              status: msg.status || 'read',
+            },
+          };
+        }
+        return c;
+      });
+      storageService.setConversations(updated);
+      return updated;
+    });
+  };
+
+
+  // Delete a specific conversation and all its messages
+  const handleDeleteConversation = async (conversationId) => {
+    if (!conversationId) return;
+    const updated = conversations.filter((c) => c.id !== conversationId);
+    setConversations(updated);
+    if (selectedConversation?.id === conversationId) {
+      setSelectedConversation(null);
     }
-    handleSelectConversation(llmConv);
+    await storageService.setConversations(updated);
+    await storageService.saveMessages(conversationId, []);
+  };
+
+  // Clear all chats history
+  const handleClearAllChats = async () => {
+    setConversations([]);
+    setSelectedConversation(null);
+    await storageService.setConversations([]);
+  };
+
+  // Open or switch to Meta AI Assistant tab
+  const handleOpenLLM = () => {
+    setCurrentView('home');
+    setActiveTab('meta-ai');
   };
 
   // Join Room by Code, Link, or Scanned Token
@@ -266,12 +603,6 @@ function MainApp() {
       handleOpenLLM();
       return;
     }
-    if (code.includes('priya')) {
-      const priyaConv = conversations.find((c) => c.name?.includes('Priya')) || conversations[0];
-      if (priyaConv) handleSelectConversation(priyaConv);
-      return;
-    }
-
     const roomId = `room_${code.replace(/[^a-zA-Z0-9_-]/g, '')}`;
     const existing = conversations.find((c) => c.id === roomId || c.name.toLowerCase() === `#${code}`);
     if (existing) {
@@ -335,8 +666,10 @@ function MainApp() {
         {
           text: 'Log Out',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
+            await storageService.clearSession();
             setIsAuthenticated(false);
+            setCurrentUser(null);
             setCurrentView('login');
             setSelectedConversation(null);
           },
@@ -354,12 +687,12 @@ function MainApp() {
         'Where would you like to share this photo?',
         [
           {
-            text: 'Send to Priya Mali',
+            text: conversations.length > 0 ? `Send to ${conversations[0]?.name || 'Chat'}` : 'Start New Chat',
             onPress: () => {
-              const priyaConv =
-                conversations.find((c) => c.name?.includes('Priya')) || conversations[0];
-              if (priyaConv) {
-                handleSelectConversation(priyaConv);
+              if (conversations.length > 0) {
+                handleSelectConversation(conversations[0]);
+              } else {
+                setIsNewChatModalVisible(true);
               }
             },
           },
@@ -386,44 +719,12 @@ function MainApp() {
     }
   };
 
-  // Top header 3-dots menu press
+  // Top header 3-dots menu press (Only Settings, Log out, Cancel)
   const handleMenuPress = () => {
     Alert.alert(
-      'PulseChat Menu',
-      'Choose a page or action:',
+      'Settings & Account',
+      'Choose an option:',
       [
-        {
-          text: 'Test Incoming Call 📞',
-          onPress: () => handleSimulateIncomingCall(),
-        },
-        {
-          text: 'Test Notification Banner 🔔',
-          onPress: () => {
-            setActiveNotification({
-              id: `notif_${Date.now()}`,
-              title: 'priya mali',
-              body: 'How are you? Testing the new in-app notification banner! 🚀',
-              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-              conversationId: 'conv_priya',
-            });
-          },
-        },
-        {
-          text: 'Join Room / Chat 🔗',
-          onPress: () => setIsJoinModalVisible(true),
-        },
-        {
-          text: 'Pulse LLM Assistant ✨',
-          onPress: handleOpenLLM,
-        },
-        {
-          text: 'New group',
-          onPress: () => setCurrentView('createGroup'),
-        },
-        {
-          text: 'Profile',
-          onPress: () => setCurrentView('profile'),
-        },
         {
           text: 'Settings',
           onPress: () => {
@@ -455,30 +756,21 @@ function MainApp() {
   if (!isAuthenticated) {
     if (currentView === 'register') {
       return (
-        <SafeAreaView style={styles.safeContainer} edges={['top', 'left', 'right']}>
-          <StatusBar style="light" backgroundColor={COLORS.headerBackground} />
+        <SafeAreaView style={[styles.safeContainer, { backgroundColor: activeColors.headerBackground }]} edges={['top', 'left', 'right']}>
+          <StatusBar style={isLight ? "dark" : "light"} backgroundColor={activeColors.headerBackground} />
           <RegisterScreen
-            onRegisterSuccess={(newUser) => {
-              setRegisteredUsers((prev) => [...prev, newUser]);
-              setCurrentUser(newUser);
-              setIsAuthenticated(true);
-              setCurrentView('main');
-            }}
+            onRegisterSuccess={handleRegisterSuccess}
             onNavigateToLogin={() => setCurrentView('login')}
           />
         </SafeAreaView>
       );
     }
     return (
-      <SafeAreaView style={styles.safeContainer} edges={['top', 'left', 'right']}>
-        <StatusBar style="light" backgroundColor={COLORS.headerBackground} />
+      <SafeAreaView style={[styles.safeContainer, { backgroundColor: activeColors.headerBackground }]} edges={['top', 'left', 'right']}>
+        <StatusBar style={isLight ? "dark" : "light"} backgroundColor={activeColors.headerBackground} />
         <LoginScreen
           registeredUsers={registeredUsers}
-          onLoginSuccess={(user) => {
-            setCurrentUser(user);
-            setIsAuthenticated(true);
-            setCurrentView('main');
-          }}
+          onLoginSuccess={handleLoginSuccess}
           onNavigateToRegister={() => setCurrentView('register')}
         />
       </SafeAreaView>
@@ -488,9 +780,11 @@ function MainApp() {
   // 2. Profile Screen View
   if (currentView === 'profile') {
     return (
-      <SafeAreaView style={styles.safeContainer} edges={['top', 'left', 'right']}>
-        <StatusBar style="light" backgroundColor={COLORS.headerBackground} />
+      <SafeAreaView style={[styles.safeContainer, { backgroundColor: activeColors.headerBackground }]} edges={['top', 'left', 'right']}>
+        <StatusBar style={isLight ? "dark" : "light"} backgroundColor={activeColors.headerBackground} />
         <ProfileScreen
+          user={currentUser}
+          onUpdateUser={handleUpdateProfile}
           onBack={() => setCurrentView('main')}
           onLogout={handleLogout}
           onOpenChat={() => {
@@ -505,8 +799,8 @@ function MainApp() {
   // 3. Create Group Screen View
   if (currentView === 'createGroup') {
     return (
-      <SafeAreaView style={styles.safeContainer} edges={['top', 'left', 'right']}>
-        <StatusBar style="light" backgroundColor={COLORS.headerBackground} />
+      <SafeAreaView style={[styles.safeContainer, { backgroundColor: activeColors.headerBackground }]} edges={['top', 'left', 'right']}>
+        <StatusBar style={isLight ? "dark" : "light"} backgroundColor={activeColors.headerBackground} />
         <CreateGroupScreen
           onBack={() => setCurrentView('main')}
           onGroupCreated={handleGroupCreated}
@@ -517,12 +811,13 @@ function MainApp() {
 
   // 4. Main Logged-In Flow (Chats, Detail, Updates, Calls, Settings)
   return (
-    <SafeAreaView style={styles.safeContainer} edges={['top', 'left', 'right']}>
-      <StatusBar style="light" backgroundColor={COLORS.headerBackground} />
+    <SafeAreaView style={[styles.safeContainer, { backgroundColor: activeColors.headerBackground }]} edges={['top', 'left', 'right']}>
+      <StatusBar style={isLight ? "dark" : "light"} backgroundColor={activeColors.headerBackground} />
 
       {/* 1. NATIVE-LOOKING WINDOW TITLE BAR (Desktop Web Only) */}
       {Platform.OS === 'web' && (
         <WhatsAppTitleBar
+          currentUser={currentUser}
           isSocketConnected={isSocketConnected}
           onMinimize={() => {}}
           onMaximize={() => {}}
@@ -547,6 +842,10 @@ function MainApp() {
       {selectedConversation ? (
         <ChatDetailScreen
           conversation={selectedConversation}
+          currentUser={currentUser}
+          theme={appTheme}
+          chatWallpaper={chatWallpaper}
+          activeCallState={callState}
           onBack={() => setSelectedConversation(null)}
           onOpenProfile={() => {
             if (selectedConversation.type === 'group') {
@@ -557,13 +856,15 @@ function MainApp() {
           }}
           onVideoCall={() => handleStartCall(selectedConversation, 'video')}
           onVoiceCall={() => handleStartCall(selectedConversation, 'voice')}
+          onMessageSent={handleMessageSent}
+          onDeleteConversation={handleDeleteConversation}
           remoteTyping={typingMap[selectedConversation.id]?.join(', ')}
           onTypingStart={() => sendTyping(selectedConversation.id, true)}
           onTypingStop={() => sendTyping(selectedConversation.id, false)}
         />
       ) : (
         /* Otherwise render Main Home Tabs View */
-        <View style={styles.mainTabContainer}>
+        <View style={[styles.mainTabContainer, { backgroundColor: activeColors.background }]}>
           {/* Top Home Navbar for non-chats tabs */}
           {activeTab !== 'chats' && (
             <HomeHeaderNavbar
@@ -581,11 +882,14 @@ function MainApp() {
             {activeTab === 'chats' && (
               <ChatsScreen
                 conversations={conversations}
+                currentUser={currentUser}
                 onSelectConversation={handleSelectConversation}
+                onDeleteConversation={handleDeleteConversation}
                 onOpenNewChat={() => setIsNewChatModalVisible(true)}
                 onOpenMetaAI={handleOpenLLM}
                 onMenuPress={handleMenuPress}
                 onCameraPress={handleHeaderCameraPress}
+                onOpenProfile={() => setCurrentView('profile')}
               />
             )}
             {activeTab === 'updates' && (
@@ -609,34 +913,44 @@ function MainApp() {
                 onSimulateIncomingCall={() => handleSimulateIncomingCall()}
               />
             )}
+            {activeTab === 'meta-ai' && (
+              <MetaAIScreen
+                currentUser={currentUser}
+                theme={appTheme}
+              />
+            )}
             {activeTab === 'settings' && (
               <SettingsScreen
+                currentUser={currentUser}
                 onOpenProfile={() => setCurrentView('profile')}
+                onUpdateUser={handleUpdateProfile}
+                onClearAllChats={handleClearAllChats}
                 onOpenCreateGroup={() => setCurrentView('createGroup')}
                 onLogout={handleLogout}
                 isSocketConnected={isSocketConnected}
                 socketUrl={socketUrl}
                 onUpdateSocketUrl={updateSocketUrl}
+                theme={appTheme}
+                onThemeChange={handleThemeChange}
+                wallpaper={chatWallpaper}
+                onWallpaperChange={handleWallpaperChange}
               />
             )}
           </View>
 
-          {/* Bottom Tab Navigation Dock (sidebardoc matching screenshot) */}
+          {/* Bottom Tab Navigation Dock (Frosted Glass sidebardoc) */}
           <BottomTabBar
             activeTab={activeTab}
             onSelectTab={(tabId) => {
-              if (tabId === 'meta-ai') {
-                handleOpenLLM();
-              } else {
-                setActiveTab(tabId);
-              }
+              setActiveTab(tabId);
             }}
             unreadChats={unreadChatsCount}
-            missedCalls={1}
+            missedCalls={liveCallCount}
             hasStatusUpdate={true}
             bottomPadding={insets.bottom}
             currentUser={currentUser}
             onOpenProfile={() => setCurrentView('profile')}
+            theme={isLight ? 'light' : 'dark'}
           />
         </View>
       )}
@@ -693,6 +1007,45 @@ function MainApp() {
         isFrontCamera={callState.isFrontCamera}
         isMinimized={callState.isMinimized}
         onEndCall={() => {
+          const finalDuration = callState.duration || 0;
+          const finalType = callState.callType || callType;
+          const targetContact = callState.activeCall?.otherUser || callContact || selectedConversation;
+          if (targetContact) {
+            const convId = targetContact.id || `conv_${targetContact.name}`;
+            const durText =
+              finalDuration > 0
+                ? finalDuration >= 60
+                  ? `${Math.floor(finalDuration / 60)}m ${finalDuration % 60}s`
+                  : `${finalDuration}s`
+                : 'Cancelled';
+            const endedCallMsg = {
+              id: `call_${Date.now()}`,
+              type: 'call',
+              callType: finalType,
+              callStatus: 'ended',
+              duration: finalDuration,
+              durationText: durText,
+              text: `${finalType === 'video' ? '📹 Video' : '📞 Voice'} call (${durText})`,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              isSentByMe: true,
+              status: 'delivered',
+              senderName: 'You',
+            };
+            storageService.appendMessage(convId, endedCallMsg);
+            handleMessageSent(convId, endedCallMsg);
+
+            // Also record in Call history
+            MOCK_CALLS.unshift({
+              id: `call_hist_${Date.now()}`,
+              name: targetContact.name,
+              avatar: targetContact.avatar,
+              type: finalType,
+              direction: 'outgoing',
+              status: finalDuration > 0 ? 'answered' : 'cancelled',
+              duration: finalDuration,
+              time: 'Just now',
+            });
+          }
           endCall();
           setIsCallModalVisible(false);
         }}
@@ -708,6 +1061,8 @@ function MainApp() {
         visible={isNewChatModalVisible}
         onClose={() => setIsNewChatModalVisible(false)}
         onSelectContact={handleStartNewChatWithContact}
+        registeredUsers={registeredUsers}
+        currentUser={currentUser}
         onOpenNewGroup={() => {
           setIsNewChatModalVisible(false);
           setCurrentView('createGroup');
@@ -747,7 +1102,9 @@ function MainApp() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <MainApp />
+      <ThemeProvider>
+        <MainApp />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
